@@ -452,20 +452,3 @@ function getCurrentLetter() {
 console.log('Game scripts loaded successfully');
 </script>
 {% endblock %}
-                    words_completed: gameState.sessionStats.wordsCompleted,
-                    total_letters: gameState.sessionStats.totalLetters,
-                    correct_letters: gameState.sessionStats.correctLetters,
-                    accuracy: accuracy
-                }
-            })
-        });
-    } catch (error) {
-        console.error('Erro ao finalizar sessão:', error);
-    }
-}
-
-// Export for camera module
-window.gameState = gameState;
-window.updateLetterProgress = updateLetterProgress;
-</script>
-{% endblock %}
