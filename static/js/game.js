@@ -180,7 +180,7 @@ class LibrasGame {
             
             if (result.success) {
                 this.gameState.currentWord = word;
-                this.setupWordDisplay();
+                console.log('Word validated and set:', word);
                 showAlert('Palavra validada! Clique em "Iniciar Jogo"', 'success');
             } else {
                 showAlert(result.message || 'Erro ao validar palavra', 'danger');
@@ -381,6 +381,7 @@ class LibrasGame {
         }
 
         console.log('Starting soletracao mode with word:', this.gameState.currentWord);
+        console.log('Current letter index:', this.gameState.currentLetterIndex);
         
         // Show soletracao mode content
         this.elements.normalModeContent.classList.add('d-none');
@@ -392,6 +393,9 @@ class LibrasGame {
         this.gameState.correctLetters = 0;
         this.gameState.totalLetters = this.gameState.currentWord.length;
         
+        console.log('After reset - Current letter index:', this.gameState.currentLetterIndex);
+        console.log('First letter should be:', this.gameState.currentWord[0]);
+        
         // Update displays
         this.updateWordDisplay();
         this.updateProgressDisplay();
@@ -401,6 +405,7 @@ class LibrasGame {
 
     async startDesafioMode() {
         console.log('Starting desafio mode with word:', this.gameState.currentWord);
+        console.log('Current letter index:', this.gameState.currentLetterIndex);
         
         // Show desafio mode content
         this.elements.normalModeContent.classList.add('d-none');
@@ -412,6 +417,9 @@ class LibrasGame {
         this.gameState.currentWordIndex = 1;
         this.gameState.correctLetters = 0;
         this.gameState.totalLetters = this.gameState.currentWord.length;
+        
+        console.log('After reset - Current letter index:', this.gameState.currentLetterIndex);
+        console.log('First letter should be:', this.gameState.currentWord[0]);
         
         // Start timer (60 segundos por palavra)
         this.gameState.timeRemaining = 60;

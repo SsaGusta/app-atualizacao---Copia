@@ -453,21 +453,34 @@ function setupDemoButtons() {
 }
 
 function getCurrentLetter() {
+    console.log('getCurrentLetter called');
+    console.log('window.gameInstance exists:', !!window.gameInstance);
+    
     // Acessar a instância global do jogo
     if (window.gameInstance && window.gameInstance.gameState) {
         const gameState = window.gameInstance.gameState;
+        console.log('gameState:', gameState);
+        console.log('currentWord:', gameState.currentWord);
+        console.log('currentLetterIndex:', gameState.currentLetterIndex);
+        
         if (gameState.currentWord && gameState.currentLetterIndex < gameState.currentWord.length) {
-            return gameState.currentWord[gameState.currentLetterIndex];
+            const letter = gameState.currentWord[gameState.currentLetterIndex];
+            console.log('Returning letter:', letter);
+            return letter;
         }
     }
+    console.log('Returning default letter A');
     return 'A'; // Default letter for demo
 }
 
 function showCurrentLetterDemo() {
+    console.log('showCurrentLetterDemo called');
+    
     const currentLetter = getCurrentLetter();
-    console.log('Showing demo for letter:', currentLetter);
+    console.log('Current letter for demo:', currentLetter);
     
     if (window.showVideoDemo) {
+        console.log('Showing video demo for letter:', currentLetter);
         window.showVideoDemo(currentLetter);
     } else {
         console.error('showVideoDemo function not available');
