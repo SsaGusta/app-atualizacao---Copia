@@ -97,14 +97,36 @@ def index():
 def login():
     """Página de login"""
     if request.method == 'POST':
-        username = request.form.get('username', '').strip()
+        # Verificar se é uma requisição AJAX (JSON)
+        if request.is_json or request.headers.get('Content-Type') == 'application/json':
+            data = request.get_json()
+            username = data.get('username', '').strip() if data else ''
+        else:
+            username = request.form.get('username', '').strip()
+        
         if username:
             session['username'] = username
             session['login_time'] = datetime.now().isoformat()
             logger.info(f"Usuário logado: {username}")
-            return redirect(url_for('game'))
+            
+            # Se for requisição AJAX, retornar JSON
+            if request.is_json or request.headers.get('Content-Type') == 'application/json':
+                return jsonify({
+                    "success": True,
+                    "message": "Login realizado com sucesso",
+                    "redirect": url_for('game')
+                })
+            else:
+                return redirect(url_for('game'))
         else:
-            return render_template('login.html', error="Nome de usuário é obrigatório")
+            # Se for requisição AJAX, retornar erro JSON
+            if request.is_json or request.headers.get('Content-Type') == 'application/json':
+                return jsonify({
+                    "success": False,
+                    "error": "Nome de usuário é obrigatório"
+                }), 400
+            else:
+                return render_template('login.html', error="Nome de usuário é obrigatório")
     
     return render_template('login.html')
 
