@@ -226,12 +226,14 @@ class LibrasGame {
                     break;
                 case 'soletracao':
                     if (!this.gameState.currentWord) {
-                        throw new Error('Para o modo Soletração, primeiro valide uma palavra personalizada!');
+                        showAlert('Para o modo Soletração, primeiro digite e valide uma palavra personalizada!', 'warning');
+                        this.stopGame();
+                        return;
                     }
                     await this.startSoletracaoMode();
                     break;
                 case 'desafio':
-                    // Call backend API to get a random word for challenge
+                    // Get a word from API based on difficulty
                     const response = await fetch('/api/start_game', {
                         method: 'POST',
                         headers: {
@@ -250,8 +252,9 @@ class LibrasGame {
                     
                     if (data.success) {
                         this.gameState.currentWord = data.word;
+                        this.gameState.difficulty = selectedDifficulty;
                         await this.startDesafioMode();
-                        showAlert(data.message || `Desafio iniciado! Palavra: ${data.word}`, 'success');
+                        showAlert(data.message || `Desafio iniciado! ${this.getDifficultyDescription(selectedDifficulty)}: ${data.word}`, 'success');
                     } else {
                         throw new Error(data.error || 'Erro ao buscar palavra para desafio');
                     }
@@ -355,14 +358,21 @@ class LibrasGame {
     }
 
     async startNormalMode() {
-        console.log('Starting normal mode');
+        console.log('Starting normal mode - free letter recognition');
         
         // Show normal mode content
         this.elements.normalModeContent.classList.remove('d-none');
         this.elements.soletracaoModeContent.classList.add('d-none');
         this.elements.desafioModeContent.classList.add('d-none');
         
-        showAlert('Modo Normal iniciado! Faça sinais com as mãos para reconhecimento livre', 'success');
+        // Clear any word-related state since this is free recognition
+        this.gameState.currentWord = '';
+        this.gameState.currentLetterIndex = 0;
+        
+        // Initialize camera for letter recognition
+        this.initializeCamera();
+        
+        showAlert('Modo Reconhecimento Normal iniciado! Faça sinais com as mãos e veja o reconhecimento em tempo real', 'success');
     }
 
     async startSoletracaoMode() {
@@ -397,13 +407,13 @@ class LibrasGame {
         this.elements.soletracaoModeContent.classList.add('d-none');
         this.elements.desafioModeContent.classList.remove('d-none');
         
-        // Reset game state for challenge
+        // Reset game state for challenge (word already set from API call)
         this.gameState.currentLetterIndex = 0;
         this.gameState.currentWordIndex = 1;
         this.gameState.correctLetters = 0;
         this.gameState.totalLetters = this.gameState.currentWord.length;
         
-        // Start timer (exemplo: 60 segundos por palavra)
+        // Start timer (60 segundos por palavra)
         this.gameState.timeRemaining = 60;
         this.startTimer();
         
@@ -411,7 +421,7 @@ class LibrasGame {
         this.updateWordDisplay();
         this.updateProgressDisplay();
         
-        showAlert(`Modo Desafio iniciado! Você tem 60 segundos para soletrar: ${this.gameState.currentWord}`, 'warning');
+        console.log(`Desafio mode started: ${this.gameState.difficulty} - ${this.gameState.currentWord}`);
     }
 
     stopGame() {
@@ -571,6 +581,21 @@ class LibrasGame {
         
         // Could show final statistics here
         console.log('Game ended');
+    }
+
+    getDifficultyDescription(difficulty) {
+        switch (difficulty) {
+            case 'iniciante':
+                return 'Palavras de 2-5 letras';
+            case 'intermediario':
+                return 'Palavras sem restrição de tamanho';
+            case 'avancado':
+                return 'Palavras compostas';
+            case 'expert':
+                return 'Frases completas';
+            default:
+                return 'Nível personalizado';
+        }
     }
 
     getCurrentLetter() {

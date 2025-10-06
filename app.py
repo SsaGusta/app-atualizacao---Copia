@@ -75,17 +75,26 @@ def get_video_path(letra):
     return None
 
 def get_random_word(mode="iniciante"):
-    """Obter palavra aleatória baseada no modo"""
+    """Obter palavra aleatória baseada no modo de dificuldade"""
     import random
     
     if mode == "iniciante":
-        return random.choice(palavras_iniciante)
+        # Iniciante: palavras de 2-5 letras
+        palavras_filtradas = [palavra for palavra in palavras_iniciante if 2 <= len(palavra) <= 5]
+        return random.choice(palavras_filtradas) if palavras_filtradas else random.choice(palavras_iniciante)
+    elif mode == "intermediario":
+        # Intermediário: qualquer palavra simples (sem restrição de tamanho)
+        return random.choice(palavras)
     elif mode == "avancado":
+        # Avançado: palavras compostas (com hífen)
         return random.choice(palavras_avancado)
     elif mode == "expert":
+        # Expert: frases completas
         return random.choice(palavras_expert)
     else:
-        return random.choice(palavras)
+        # Padrão: iniciante
+        palavras_filtradas = [palavra for palavra in palavras_iniciante if 2 <= len(palavra) <= 5]
+        return random.choice(palavras_filtradas) if palavras_filtradas else random.choice(palavras_iniciante)
 
 # ===== ROTAS PRINCIPAIS =====
 @app.route('/')
