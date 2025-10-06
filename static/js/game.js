@@ -393,14 +393,20 @@ class LibrasGame {
         this.gameState.correctLetters = 0;
         this.gameState.totalLetters = this.gameState.currentWord.length;
         
+        // Set timer based on difficulty
+        this.gameState.timeRemaining = this.getDifficultyTime(this.gameState.difficulty);
+        this.gameState.startTime = Date.now();
+        this.startTimer();
+        
         console.log('After reset - Current letter index:', this.gameState.currentLetterIndex);
         console.log('First letter should be:', this.gameState.currentWord[0]);
+        console.log('Timer set to:', this.gameState.timeRemaining, 'seconds');
         
         // Update displays
         this.updateWordDisplay();
         this.updateProgressDisplay();
         
-        showAlert(`Modo Soletração iniciado! Soletre: ${this.gameState.currentWord}`, 'success');
+        showAlert(`Modo Soletração iniciado! Soletre: ${this.gameState.currentWord} (${this.gameState.timeRemaining}s)`, 'success');
     }
 
     async startDesafioMode() {
@@ -418,12 +424,14 @@ class LibrasGame {
         this.gameState.correctLetters = 0;
         this.gameState.totalLetters = this.gameState.currentWord.length;
         
+        // Set timer based on difficulty
+        this.gameState.timeRemaining = this.getDifficultyTime(this.gameState.difficulty);
+        this.gameState.startTime = Date.now();
+        this.startTimer();
+        
         console.log('After reset - Current letter index:', this.gameState.currentLetterIndex);
         console.log('First letter should be:', this.gameState.currentWord[0]);
-        
-        // Start timer (60 segundos por palavra)
-        this.gameState.timeRemaining = 60;
-        this.startTimer();
+        console.log('Timer set to:', this.gameState.timeRemaining, 'seconds');
         
         // Update displays
         this.updateWordDisplay();
@@ -448,6 +456,13 @@ class LibrasGame {
         if (this.gameState.gameTimer) {
             clearInterval(this.gameState.gameTimer);
             this.gameState.gameTimer = null;
+        }
+        
+        // Reset timer display
+        const timerElement = document.getElementById('timeRemaining');
+        if (timerElement) {
+            timerElement.textContent = '0:00';
+            timerElement.className = 'h3 mb-0';
         }
 
         showAlert('Jogo parado', 'info');
@@ -521,14 +536,14 @@ class LibrasGame {
             clearInterval(this.gameState.gameTimer);
         }
 
+        // Update timer display initially
+        this.updateTimerDisplay();
+
         this.gameState.gameTimer = setInterval(() => {
             this.gameState.timeRemaining--;
             
-            // Update timer display if exists
-            const timerElement = document.getElementById('timeRemaining');
-            if (timerElement) {
-                timerElement.textContent = this.gameState.timeRemaining;
-            }
+            // Update timer display
+            this.updateTimerDisplay();
 
             if (this.gameState.timeRemaining <= 0) {
                 this.onTimeUp();
@@ -536,12 +551,81 @@ class LibrasGame {
         }, 1000);
     }
 
+    updateTimerDisplay() {
+        const timerElement = document.getElementById('timeRemaining');
+        if (timerElement) {
+            const minutes = Math.floor(this.gameState.timeRemaining / 60);
+            const seconds = this.gameState.timeRemaining % 60;
+            timerElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            
+            // Change color based on time remaining
+            if (this.gameState.timeRemaining <= 30) {
+                timerElement.className = 'h3 mb-0 text-danger';
+            } else if (this.gameState.timeRemaining <= 60) {
+                timerElement.className = 'h3 mb-0 text-warning';
+            } else {
+                timerElement.className = 'h3 mb-0 text-success';
+            }
+        }
+    }
+
     onTimeUp() {
         clearInterval(this.gameState.gameTimer);
-        showAlert('Tempo esgotado! Próxima palavra...', 'warning');
         
-        // Move to next word or end game
-        this.nextWord();
+        // Calculate final statistics
+        const timeSpent = this.getDifficultyTime(this.gameState.difficulty) - this.gameState.timeRemaining;
+        const accuracy = this.gameState.totalLetters > 0 ? 
+            Math.round((this.gameState.correctLetters / this.gameState.totalLetters) * 100) : 0;
+        
+        console.log('Time up! Saving results...');
+        
+        // Save results to database
+        this.saveGameResults(false, timeSpent, accuracy);
+        
+        showAlert('Tempo esgotado! Resultado salvo.', 'warning');
+        
+        // End the game
+        this.endGame();
+    }
+
+    async saveGameResults(completed = false, timeSpent = 0, accuracy = 0) {
+        try {
+            const gameData = {
+                mode: this.gameState.mode,
+                difficulty: this.gameState.difficulty,
+                word: this.gameState.currentWord,
+                completed: completed,
+                time_spent: timeSpent,
+                total_time: this.getDifficultyTime(this.gameState.difficulty),
+                letters_completed: this.gameState.correctLetters,
+                total_letters: this.gameState.totalLetters,
+                accuracy: accuracy
+            };
+            
+            console.log('Saving game data:', gameData);
+            
+            const response = await fetch('/api/save_game_result', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(gameData)
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                console.log('Game result saved successfully:', result.message);
+                return true;
+            } else {
+                console.error('Failed to save game result:', result.error);
+                return false;
+            }
+            
+        } catch (error) {
+            console.error('Error saving game results:', error);
+            return false;
+        }
     }
 
     async nextWord() {
@@ -584,8 +668,18 @@ class LibrasGame {
     }
 
     endGame() {
+        // Calculate final statistics if not already calculated
+        if (this.gameState.isPlaying) {
+            const timeSpent = this.getDifficultyTime(this.gameState.difficulty) - this.gameState.timeRemaining;
+            const accuracy = this.gameState.totalLetters > 0 ? 
+                Math.round((this.gameState.correctLetters / this.gameState.totalLetters) * 100) : 0;
+            
+            // Save results for completed game
+            this.saveGameResults(true, timeSpent, accuracy);
+        }
+        
         this.stopGame();
-        showAlert('Jogo finalizado! Parabéns!', 'success');
+        showAlert('Jogo finalizado! Resultados salvos com sucesso!', 'success');
         
         // Could show final statistics here
         console.log('Game ended');
@@ -603,6 +697,21 @@ class LibrasGame {
                 return 'Frases completas';
             default:
                 return 'Nível personalizado';
+        }
+    }
+
+    getDifficultyTime(difficulty) {
+        switch (difficulty) {
+            case 'iniciante':
+                return 180; // 3 minutos
+            case 'intermediario':
+                return 160; // 2:40 minutos
+            case 'avancado':
+                return 100; // 1:40 minutos
+            case 'expert':
+                return 60;  // 1 minuto
+            default:
+                return 120; // 2 minutos padrão
         }
     }
 

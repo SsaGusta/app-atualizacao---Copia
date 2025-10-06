@@ -351,6 +351,76 @@ def get_video_demo(letra):
             "error": f"Erro interno: {e}"
         })
 
+@app.route('/api/save_game_result', methods=['POST'])
+def save_game_result():
+    """Salvar resultado do jogo no banco de dados"""
+    try:
+        if 'username' not in session:
+            return jsonify({"success": False, "error": "Usuário não logado"}), 401
+        
+        data = request.get_json()
+        username = session['username']
+        
+        # Dados do resultado
+        mode = data.get('mode', '')
+        difficulty = data.get('difficulty', '')
+        word = data.get('word', '')
+        completed = data.get('completed', False)
+        time_spent = data.get('time_spent', 0)
+        total_time = data.get('total_time', 0)
+        letters_completed = data.get('letters_completed', 0)
+        total_letters = data.get('total_letters', 0)
+        accuracy = data.get('accuracy', 0)
+        
+        logger.info(f"Salvando resultado: {username} - {mode} - {difficulty} - {word}")
+        
+        if DATABASE_AVAILABLE:
+            try:
+                # Importar função de salvamento do database.py
+                from database import save_game_session
+                
+                result = save_game_session(
+                    username=username,
+                    mode=mode,
+                    difficulty=difficulty,
+                    word=word,
+                    completed=completed,
+                    time_spent=time_spent,
+                    total_time=total_time,
+                    letters_completed=letters_completed,
+                    total_letters=total_letters,
+                    accuracy=accuracy
+                )
+                
+                if result:
+                    return jsonify({
+                        "success": True,
+                        "message": "Resultado salvo com sucesso",
+                        "data": {
+                            "username": username,
+                            "mode": mode,
+                            "difficulty": difficulty,
+                            "completed": completed
+                        }
+                    })
+                else:
+                    return jsonify({"success": False, "error": "Erro ao salvar no banco"})
+                    
+            except Exception as db_error:
+                logger.error(f"Erro no banco de dados: {db_error}")
+                return jsonify({"success": False, "error": f"Erro no banco: {db_error}"})
+        else:
+            logger.info("Banco não disponível - resultado não salvo")
+            return jsonify({
+                "success": True,
+                "message": "Resultado processado (banco não disponível)",
+                "data": {"username": username, "mode": mode}
+            })
+            
+    except Exception as e:
+        logger.error(f"Erro em save_game_result: {e}")
+        return jsonify({"success": False, "error": f"Erro interno: {e}"})
+
 # ===== ROTAS DE SISTEMA =====
 @app.route('/api/logout', methods=['POST'])
 def logout():

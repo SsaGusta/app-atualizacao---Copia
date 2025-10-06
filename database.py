@@ -322,3 +322,29 @@ class LibrasDatabase:
         
         print(f"Limpeza concluída: {rows_deleted} sessões antigas removidas")
         return rows_deleted
+
+def save_game_session(username, mode, difficulty, word, completed, time_spent, total_time, letters_completed, total_letters, accuracy):
+    """Função helper para salvar resultado de uma sessão de jogo"""
+    try:
+        db = LibrasDatabase()
+        
+        # Obter ou criar usuário
+        user_id = db.get_or_create_user(username)
+        
+        # Calcular duração
+        duration = total_time - time_spent if time_spent < total_time else time_spent
+        
+        # Iniciar sessão
+        session_id = db.start_session(user_id, mode, difficulty)
+        
+        # Adicionar palavra praticada
+        db.add_practiced_word(session_id, word, duration, completed, letters_completed)
+        
+        # Finalizar sessão
+        db.end_session(session_id, 1 if completed else 0, total_letters, letters_completed, accuracy)
+        
+        return True
+        
+    except Exception as e:
+        print(f"Erro ao salvar sessão de jogo: {e}")
+        return False
