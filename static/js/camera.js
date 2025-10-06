@@ -10,6 +10,8 @@ class CameraManager {
         this.frameCount = 0;
         this.fpsInterval = null;
         this.processingInterval = null;
+        this.cameraPermissionGranted = false;
+        this.cameraErrorMessage = '';
     }
 
     init() {
@@ -21,6 +23,152 @@ class CameraManager {
         }
         
         this.setupFPSCounter();
+        this.setupCameraPermissionUI();
+    }
+
+    setupCameraPermissionUI() {
+        // Criar botão para solicitar câmera se não existir
+        if (!document.getElementById('requestCameraBtn')) {
+            const cameraContainer = document.querySelector('.camera-container');
+            if (cameraContainer) {
+                const overlay = document.createElement('div');
+                overlay.className = 'camera-permission-overlay';
+                overlay.style.cssText = `
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0,0,0,0.8);
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                    align-items: center;
+                    color: white;
+                    text-align: center;
+                    padding: 20px;
+                    z-index: 10;
+                `;
+                
+                overlay.innerHTML = `
+                    <i class="fas fa-video fa-3x mb-3"></i>
+                    <h5>Câmera necessária</h5>
+                    <p>Para usar o reconhecimento de sinais, precisamos acessar sua câmera.</p>
+                    <button id="requestCameraBtn" class="btn btn-primary">
+                        <i class="fas fa-camera"></i> Permitir Câmera
+                    </button>
+                    <button id="skipCameraBtn" class="btn btn-secondary mt-2">
+                        <i class="fas fa-eye"></i> Usar apenas vídeos
+                    </button>
+                    <small class="mt-2 text-muted">Você pode usar apenas os vídeos de demonstração</small>
+                `;
+                
+                cameraContainer.appendChild(overlay);
+                
+                // Event listeners
+                document.getElementById('requestCameraBtn').addEventListener('click', () => this.requestCameraPermission());
+                document.getElementById('skipCameraBtn').addEventListener('click', () => this.skipCamera());
+            }
+        }
+    }
+
+    async requestCameraPermission() {
+        try {
+            showAlert('Solicitando permissão da câmera...', 'info');
+            await this.start();
+            
+            // Remover overlay se sucesso
+            const overlay = document.querySelector('.camera-permission-overlay');
+            if (overlay) overlay.remove();
+            
+        } catch (error) {
+            this.handleCameraError(error);
+        }
+    }
+
+    skipCamera() {
+        // Remover overlay e mostrar apenas vídeo demo
+        const overlay = document.querySelector('.camera-permission-overlay');
+        if (overlay) overlay.remove();
+        
+        // Mostrar mensagem informativa
+        const cameraContainer = document.querySelector('.camera-container');
+        if (cameraContainer) {
+            cameraContainer.innerHTML = `
+                <div class="camera-demo-mode" style="
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    padding: 40px;
+                    text-align: center;
+                    border-radius: 10px;
+                ">
+                    <i class="fas fa-play-circle fa-4x mb-3"></i>
+                    <h4>Modo Demonstração</h4>
+                    <p>Use os vídeos de demonstração para aprender os sinais</p>
+                    <small>Câmera não disponível nesta sessão</small>
+                </div>
+            `;
+        }
+        
+        showAlert('Modo demonstração ativado. Use os vídeos para aprender!', 'info');
+    }
+
+    handleCameraError(error) {
+        console.error('Erro da câmera:', error);
+        let message = 'Erro desconhecido';
+        let solution = '';
+        
+        switch(error.name) {
+            case 'NotAllowedError':
+            case 'PermissionDeniedError':
+                message = 'Permissão da câmera negada';
+                solution = 'Por favor, clique no ícone da câmera na barra de endereços e permita o acesso.';
+                break;
+            case 'NotFoundError':
+            case 'DevicesNotFoundError':
+                message = 'Nenhuma câmera encontrada';
+                solution = 'Verifique se sua câmera está conectada e funcionando.';
+                break;
+            case 'NotReadableError':
+            case 'TrackStartError':
+                message = 'Câmera em uso por outro aplicativo';
+                solution = 'Feche outros aplicativos que possam estar usando a câmera.';
+                break;
+            case 'NotSupportedError':
+                message = 'Câmera não suportada';
+                solution = 'Seu navegador ou dispositivo não suporta acesso à câmera.';
+                break;
+        }
+        
+        // Mostrar erro detalhado
+        const overlay = document.querySelector('.camera-permission-overlay');
+        if (overlay) {
+            overlay.innerHTML = `
+                <i class="fas fa-exclamation-triangle fa-3x mb-3 text-warning"></i>
+                <h5>Problema com a Câmera</h5>
+                <p><strong>${message}</strong></p>
+                <p class="small">${solution}</p>
+                <div class="mt-3">
+                    <button id="retryCameraBtn" class="btn btn-warning">
+                        <i class="fas fa-redo"></i> Tentar Novamente
+                    </button>
+                    <button id="skipCameraBtn2" class="btn btn-secondary">
+                        <i class="fas fa-eye"></i> Usar apenas vídeos
+                    </button>
+                </div>
+                <div class="mt-3">
+                    <small class="text-info">
+                        <i class="fas fa-lightbulb"></i> 
+                        Dica: Clique no ícone da câmera/cadeado na barra de endereços do navegador
+                    </small>
+                </div>
+            `;
+            
+            document.getElementById('retryCameraBtn').addEventListener('click', () => this.requestCameraPermission());
+            document.getElementById('skipCameraBtn2').addEventListener('click', () => this.skipCamera());
+        }
+        
+        showAlert(`Erro da câmera: ${message}`, 'warning', 8000);
     }
 
     async start() {
@@ -37,6 +185,7 @@ class CameraManager {
 
             this.videoElement.srcObject = this.stream;
             this.isActive = true;
+            this.cameraPermissionGranted = true;
 
             // Update camera status
             this.updateCameraStatus('Conectada', 'success');

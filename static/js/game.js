@@ -177,33 +177,73 @@ class LibrasGame {
     }
 
     async startGame() {
-        this.gameState.isPlaying = true;
+        console.log('Iniciando jogo...');
         
-        // Update button states
-        this.elements.startGameBtn.classList.add('d-none');
-        this.elements.stopGameBtn.classList.remove('d-none');
-        
-        // Show game content
-        this.elements.gameContent.style.display = 'block';
-
         try {
-            // Start appropriate game mode
-            switch (this.gameState.mode) {
-                case 'normal':
-                    await this.startNormalMode();
-                    break;
-                case 'soletracao':
-                    await this.startSoletracaoMode();
-                    break;
-                case 'desafio':
-                    await this.startDesafioMode();
-                    break;
+            this.gameState.isPlaying = true;
+            
+            // Update button states
+            if (this.elements.startGameBtn) {
+                this.elements.startGameBtn.classList.add('d-none');
+            }
+            if (this.elements.stopGameBtn) {
+                this.elements.stopGameBtn.classList.remove('d-none');
+            }
+            
+            // Show game content
+            if (this.elements.gameContent) {
+                this.elements.gameContent.style.display = 'block';
             }
 
-            // Initialize camera
-            if (window.CameraManager) {
-                await window.CameraManager.init();
-                await window.CameraManager.start();
+            // Get selected mode and difficulty
+            const mode = this.elements.difficultySelect ? this.elements.difficultySelect.value : 'iniciante';
+            this.gameState.difficulty = mode;
+
+            // Call backend API to start game
+            const response = await fetch('/api/start_game', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ 
+                    mode: mode 
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Erro HTTP: ${response.status}`);
+            }
+
+            const data = await response.json();
+            
+            if (data.success) {
+                this.gameState.currentWord = data.word;
+                this.gameState.mode = data.mode;
+                
+                console.log('Jogo iniciado:', data);
+                
+                // Start appropriate game mode
+                switch (this.gameState.mode) {
+                    case 'iniciante':
+                        await this.startDesafioMode();
+                        break;
+                    case 'avancado':
+                        await this.startSoletracaoMode();
+                        break;
+                    case 'expert':
+                        await this.startDesafioMode();
+                        break;
+                    default:
+                        await this.startNormalMode();
+                }
+
+                // Initialize camera (opcional)
+                this.initializeCamera();
+                
+                showAlert(data.message || `Jogo iniciado! Palavra: ${data.word}`, 'success');
+                
+            } else {
+                throw new Error(data.error || 'Erro desconhecido ao iniciar jogo');
             }
 
         } catch (error) {
@@ -213,9 +253,94 @@ class LibrasGame {
         }
     }
 
+    initializeCamera() {
+        // Tentar inicializar câmera de forma não-bloqueante
+        setTimeout(async () => {
+            try {
+                if (window.cameraManager) {
+                    await window.cameraManager.init();
+                } else {
+                    console.log('CameraManager não disponível');
+                }
+            } catch (error) {
+                console.log('Câmera não disponível:', error.message);
+                // Não mostrar erro, pois câmera é opcional
+            }
+        }, 1000);
+    }
+
+    updateWordDisplay() {
+        // Atualizar exibição da palavra atual
+        if (this.elements.currentWord) {
+            this.elements.currentWord.textContent = this.gameState.currentWord;
+        }
+        if (this.elements.challengeWord) {
+            this.elements.challengeWord.textContent = this.gameState.currentWord;
+        }
+        
+        // Criar caixas de letras
+        this.createLetterBoxes();
+    }
+
+    createLetterBoxes() {
+        const word = this.gameState.currentWord;
+        if (!word) return;
+
+        // Para modo normal
+        if (this.elements.letterBoxes) {
+            this.elements.letterBoxes.innerHTML = '';
+            for (let i = 0; i < word.length; i++) {
+                const box = document.createElement('div');
+                box.className = 'letter-box';
+                box.style.cssText = `
+                    display: inline-block;
+                    width: 50px;
+                    height: 50px;
+                    border: 2px solid #ddd;
+                    margin: 0 5px;
+                    text-align: center;
+                    line-height: 46px;
+                    font-size: 24px;
+                    font-weight: bold;
+                    border-radius: 5px;
+                    background: white;
+                `;
+                box.textContent = '_';
+                box.id = `letter-${i}`;
+                this.elements.letterBoxes.appendChild(box);
+            }
+        }
+
+        // Para modo desafio
+        if (this.elements.challengeLetterBoxes) {
+            this.elements.challengeLetterBoxes.innerHTML = '';
+            for (let i = 0; i < word.length; i++) {
+                const box = document.createElement('div');
+                box.className = 'letter-box';
+                box.style.cssText = `
+                    display: inline-block;
+                    width: 50px;
+                    height: 50px;
+                    border: 2px solid #ddd;
+                    margin: 0 5px;
+                    text-align: center;
+                    line-height: 46px;
+                    font-size: 24px;
+                    font-weight: bold;
+                    border-radius: 5px;
+                    background: white;
+                `;
+                box.textContent = '_';
+                box.id = `challenge-letter-${i}`;
+                this.elements.challengeLetterBoxes.appendChild(box);
+            }
+        }
+    }
+
     async startNormalMode() {
         console.log('Starting normal mode');
-        showAlert('Modo normal iniciado! Faça sinais com as mãos', 'success');
+        this.updateWordDisplay();
+        showAlert('Modo normal iniciado! Use os vídeos de demonstração', 'success');
     }
 
     async startSoletracaoMode() {
