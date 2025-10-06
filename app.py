@@ -1,15 +1,11 @@
-# ===== APLICAÇÃO WEB FLASK PARA LIBRAS =====
+# ===== APLICAÇÃO WEB FLASK PARA LIBRAS (Versão Deploy) =====
 import os
 import json
 import time
-import cv2
-import numpy as np
-import mediapipe as mp
 import pandas as pd
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_file, abort
 from flask_session import Session
-from sklearn.ensemble import RandomForestClassifier
 import base64
 from io import BytesIO
 from PIL import Image
@@ -48,128 +44,42 @@ app = Flask(__name__)
 app.secret_key = 'libras_web_app_2024_secret_key'  # Mudar em produção
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_PERMANENT'] = False
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
+
+# Inicializar extensões
 Session(app)
+CORS(app)
 
-# Habilitar CORS para todas as rotas
-CORS(app, supports_credentials=True)
+# ===== CONFIGURAÇÃO GLOBAL =====
+# Sistema de reconhecimento desabilitado para deploy
+RECOGNITION_ENABLED = False
 
-# Configurar logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Variáveis globais para o jogo
+current_word = ""
+current_mode = "iniciante"
+game_active = False
+score = 0
+words_completed = []
 
-# ===== INICIALIZAÇÃO DE COMPONENTES =====
-try:
-    if DATABASE_AVAILABLE:
-        db = LibrasDatabase()
-        logger.info("Banco de dados conectado com sucesso")
+# ===== FUNÇÕES AUXILIARES =====
+def get_video_path(letra):
+    """Obter caminho do vídeo para uma letra específica"""
+    video_path = os.path.join('Videos', f'Letra_{letra.upper()}.mp4')
+    if os.path.exists(video_path):
+        return video_path
+    return None
+
+def get_random_word(mode="iniciante"):
+    """Obter palavra aleatória baseada no modo"""
+    import random
+    
+    if mode == "iniciante":
+        return random.choice(palavras_iniciante)
+    elif mode == "avancado":
+        return random.choice(palavras_avancado)
+    elif mode == "expert":
+        return random.choice(palavras_expert)
     else:
-        db = None
-        logger.warning("Banco de dados não disponível")
-except Exception as e:
-    DATABASE_AVAILABLE = False
-    db = None
-    logger.error(f"Erro ao conectar banco de dados: {e}")
-
-# Configuração MediaPipe
-mp_hands = mp.solutions.hands
-mp_drawing = mp.solutions.drawing_utils
-
-# ===== CLASSE PARA PROCESSAMENTO ML =====
-class LibrasMLProcessor:
-    def __init__(self):
-        self.hands = mp_hands.Hands(
-            static_image_mode=False,
-            max_num_hands=1,
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.3
-        )
-        self.model = None
-        self.letters_data = []
-        self.setup_model()
-    
-    def setup_model(self):
-        """Configura o modelo de machine learning"""
-        try:
-            # Dados de treinamento básicos (simplificado para web)
-            dados_path = 'dados_libras.csv'
-            if os.path.exists(dados_path):
-                dados = pd.read_csv(dados_path)
-                if 'letter' in dados.columns:
-                    X = dados.drop(['letter'], axis=1)
-                    y = dados['letter']
-                    
-                    self.model = RandomForestClassifier(n_estimators=20, random_state=42)
-                    self.model.fit(X, y)
-                    logger.info("Modelo ML carregado com dados CSV")
-                else:
-                    logger.warning("Coluna 'letter' não encontrada no CSV")
-                    self.create_dummy_model()
-            else:
-                logger.warning("Arquivo de dados não encontrado, usando modelo simulado")
-                self.create_dummy_model()
-        except Exception as e:
-            logger.error(f"Erro ao configurar modelo ML: {e}")
-            self.create_dummy_model()
-    
-    def create_dummy_model(self):
-        """Cria um modelo simulado para demonstração"""
-        # Criar dados sintéticos para demonstração
-        import random
-        from string import ascii_uppercase
-        
-        # Dados sintéticos (63 features para 26 letras)
-        X_dummy = []
-        y_dummy = []
-        
-        for letter in ascii_uppercase:
-            for _ in range(10):  # 10 amostras por letra
-                # Criar landmarks fictícios (63 features)
-                features = [random.uniform(-1, 1) for _ in range(63)]
-                X_dummy.append(features)
-                y_dummy.append(letter)
-        
-        self.model = RandomForestClassifier(n_estimators=20, random_state=42)
-        self.model.fit(X_dummy, y_dummy)
-        logger.info("Modelo ML simulado criado com sucesso")
-    
-    def extract_landmarks(self, frame):
-        """Extrai landmarks da mão do frame"""
-        try:
-            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            results = self.hands.process(rgb_frame)
-            
-            if results.multi_hand_landmarks:
-                landmarks = []
-                for hand_landmarks in results.multi_hand_landmarks:
-                    for landmark in hand_landmarks.landmark:
-                        landmarks.extend([landmark.x, landmark.y, landmark.z])
-                
-                # Normalizar para 63 features (21 pontos * 3 coordenadas)
-                while len(landmarks) < 63:
-                    landmarks.append(0.0)
-                
-                return landmarks[:63]
-            
-            return [0.0] * 63
-        except Exception as e:
-            logger.error(f"Erro ao extrair landmarks: {e}")
-            return [0.0] * 63
-    
-    def predict_letter(self, landmarks):
-        """Prediz a letra baseada nos landmarks"""
-        try:
-            if self.model and landmarks:
-                prediction = self.model.predict([landmarks])
-                confidence = max(self.model.predict_proba([landmarks])[0])
-                return prediction[0], confidence
-            return None, 0.0
-        except Exception as e:
-            logger.error(f"Erro na predição: {e}")
-            return None, 0.0
-
-# Instância global do processador ML
-ml_processor = LibrasMLProcessor()
+        return random.choice(palavras)
 
 # ===== ROTAS PRINCIPAIS =====
 @app.route('/')
@@ -179,55 +89,28 @@ def index():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    """Sistema de login"""
+    """Página de login"""
     if request.method == 'POST':
-        try:
-            # Verificar se é JSON ou form data
-            if request.is_json:
-                data = request.get_json()
-            else:
-                data = request.form.to_dict()
-            
-            username = data.get('username', '').strip()
-            
-            if not username:
-                return jsonify({'success': False, 'message': 'Nome de usuário obrigatório'}), 400
-            
-            # Verificar se usuário existe ou criar novo
-            if DATABASE_AVAILABLE and db:
-                try:
-                    user_id = db.get_user_id(username)
-                    if not user_id:
-                        user_id = db.create_user(username)
-                    
-                    session['user_id'] = user_id
-                    session['username'] = username
-                    logger.info(f"Usuário {username} logado com sucesso")
-                except Exception as db_error:
-                    logger.error(f"Erro no banco de dados: {db_error}")
-                    # Continuar sem banco
-                    session['username'] = username
-                    session['user_id'] = 1
-            else:
-                # Modo sem banco de dados
-                session['username'] = username
-                session['user_id'] = 1
-            
-            return jsonify({'success': True, 'message': f'Bem-vindo, {username}!'})
-        
-        except Exception as e:
-            logger.error(f"Erro no login: {e}")
-            return jsonify({'success': False, 'message': 'Erro interno do servidor'}), 500
+        username = request.form.get('username', '').strip()
+        if username:
+            session['username'] = username
+            session['login_time'] = datetime.now().isoformat()
+            logger.info(f"Usuário logado: {username}")
+            return redirect(url_for('game'))
+        else:
+            return render_template('login.html', error="Nome de usuário é obrigatório")
     
     return render_template('login.html')
 
 @app.route('/game')
 def game():
-    """Página do jogo"""
+    """Página principal do jogo"""
     if 'username' not in session:
         return redirect(url_for('login'))
     
-    return render_template('game.html', username=session['username'])
+    return render_template('game.html', 
+                         username=session['username'],
+                         recognition_enabled=RECOGNITION_ENABLED)
 
 @app.route('/statistics')
 def statistics():
@@ -236,273 +119,171 @@ def statistics():
         return redirect(url_for('login'))
     
     stats = {}
-    if DATABASE_AVAILABLE and 'user_id' in session:
+    if DATABASE_AVAILABLE:
         try:
-            stats = db.get_user_statistics(session['user_id'])
+            db = LibrasDatabase()
+            stats = db.get_user_statistics(session['username'])
         except Exception as e:
             logger.error(f"Erro ao carregar estatísticas: {e}")
+            stats = {"error": "Não foi possível carregar as estatísticas"}
+    else:
+        stats = {"info": "Sistema de estatísticas não disponível"}
     
-    return render_template('statistics.html', stats=stats, username=session['username'])
+    return render_template('statistics.html', stats=stats)
 
-@app.route('/logout')
-def logout():
-    """Logout do usuário"""
-    session.clear()
-    return redirect(url_for('index'))
-
-# ===== API ENDPOINTS =====
-@app.route('/api/health')
-def health_check():
-    """Endpoint de saúde da aplicação"""
+# ===== API ROUTES =====
+@app.route('/api/start_game', methods=['POST'])
+def start_game():
+    """Iniciar novo jogo"""
+    global current_word, current_mode, game_active, score, words_completed
+    
+    data = request.get_json()
+    mode = data.get('mode', 'iniciante')
+    
+    current_mode = mode
+    current_word = get_random_word(mode)
+    game_active = True
+    score = 0
+    words_completed = []
+    
     return jsonify({
-        'status': 'ok',
-        'timestamp': datetime.now().isoformat(),
-        'database': DATABASE_AVAILABLE,
-        'ml_model': ml_processor.model is not None
+        "success": True,
+        "word": current_word,
+        "mode": mode,
+        "recognition_enabled": RECOGNITION_ENABLED
     })
 
-@app.route('/api/words/<difficulty>')
-def get_words(difficulty):
-    """Retorna palavras por dificuldade"""
-    try:
-        word_lists = {
-            'iniciante': palavras_iniciante,
-            'intermediario': palavras,
-            'avancado': palavras_avancado,
-            'expert': palavras_expert
-        }
-        
-        words = word_lists.get(difficulty, palavras_iniciante)
-        return jsonify({'success': True, 'words': words})
+@app.route('/api/next_word', methods=['POST'])
+def next_word():
+    """Próxima palavra do jogo"""
+    global current_word, words_completed
     
-    except Exception as e:
-        logger.error(f"Erro ao buscar palavras: {e}")
-        return jsonify({'success': False, 'message': 'Erro ao carregar palavras'})
-
-@app.route('/api/validate_word', methods=['POST'])
-def validate_word():
-    """Valida palavra customizada para modo soletração"""
-    try:
-        data = request.get_json()
-        word = data.get('word', '').upper().strip()
-        difficulty = data.get('difficulty', 'iniciante')
+    if game_active:
+        # Adicionar palavra atual como completada
+        if current_word:
+            words_completed.append(current_word)
         
-        if not word:
-            return jsonify({'success': False, 'message': 'Palavra não fornecida'})
-        
-        if not word.isalpha():
-            return jsonify({'success': False, 'message': 'Palavra deve conter apenas letras'})
-        
-        # Configurações de dificuldade (baseado no código original)
-        difficulty_configs = {
-            'iniciante': {'letters': list('ABCDEFGHIJKLMNOPQRSTUVWXYZ')},  # Todas as letras
-            'intermediario': {'letters': list('ABCDEFGHIJKLMNOPQRSTUVWXYZ')},
-            'avancado': {'letters': list('ABCDEFGHIJKLMNOPQRSTUVWXYZ')},
-            'expert': {'letters': list('ABCDEFGHIJKLMNOPQRSTUVWXYZ')}
-        }
-        
-        config = difficulty_configs.get(difficulty, difficulty_configs['iniciante'])
-        allowed_letters = set(config['letters'])
-        
-        # Filtrar palavra baseado na dificuldade
-        filtered_word = ''.join([letter for letter in word if letter in allowed_letters])
-        
-        if not filtered_word:
-            return jsonify({
-                'success': False, 
-                'message': f'A palavra não contém letras permitidas na dificuldade {difficulty}'
-            })
-        
-        response_data = {'success': True, 'filtered_word': filtered_word}
-        
-        if filtered_word != word:
-            response_data['warning'] = f'Palavra adaptada de "{word}" para "{filtered_word}"'
-        
-        return jsonify(response_data)
-    
-    except Exception as e:
-        logger.error(f"Erro ao validar palavra: {e}")
-        return jsonify({'success': False, 'message': 'Erro interno do servidor'})
-
-@app.route('/api/process_frame', methods=['POST'])
-def process_frame():
-    """Processa frame da câmera para reconhecimento"""
-    try:
-        data = request.get_json()
-        image_data = data.get('image', '')
-        
-        if not image_data:
-            return jsonify({'success': False, 'message': 'Imagem não fornecida'})
-        
-        # Decodificar imagem base64
-        image_data = image_data.split(',')[1]  # Remove data:image/jpeg;base64,
-        image_bytes = base64.b64decode(image_data)
-        
-        # Converter para numpy array
-        nparr = np.frombuffer(image_bytes, np.uint8)
-        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        
-        if frame is None:
-            return jsonify({'success': False, 'message': 'Erro ao decodificar imagem'})
-        
-        # Processar com ML
-        landmarks = ml_processor.extract_landmarks(frame)
-        letter, confidence = ml_processor.predict_letter(landmarks)
+        # Obter próxima palavra
+        current_word = get_random_word(current_mode)
         
         return jsonify({
-            'success': True,
-            'letter': letter,
-            'confidence': float(confidence) if confidence else 0.0,
-            'has_hand': len([x for x in landmarks if x != 0.0]) > 0
+            "success": True,
+            "word": current_word,
+            "completed_words": len(words_completed)
         })
     
-    except Exception as e:
-        logger.error(f"Erro ao processar frame: {e}")
-        return jsonify({'success': False, 'message': 'Erro interno do servidor'})
+    return jsonify({"success": False, "error": "Jogo não está ativo"})
 
-@app.route('/api/start_session', methods=['POST'])
-def start_session():
-    """Inicia uma nova sessão de jogo"""
-    try:
-        if 'user_id' not in session:
-            return jsonify({'success': False, 'message': 'Usuário não logado'})
-        
-        data = request.get_json()
-        game_mode = data.get('mode', 'normal')  # normal, soletracao, desafio
-        difficulty = data.get('difficulty', 'iniciante')
-        custom_word = data.get('custom_word', '')  # Para modo soletração
-        
-        session_data = {
-            'mode': game_mode,
-            'difficulty': difficulty,
-            'start_time': time.time()
-        }
-        
-        if game_mode == 'soletracao' and custom_word:
-            session_data['custom_word'] = custom_word.upper()
-        
-        if DATABASE_AVAILABLE and db:
-            session_id = db.start_game_session(session['user_id'], game_mode, difficulty)
-            session['current_session_id'] = session_id
-            session_data['session_id'] = session_id
-        else:
-            session['current_session_id'] = int(time.time())
-            session_data['session_id'] = session['current_session_id']
-        
-        session['game_session_data'] = session_data
-        
-        return jsonify({'success': True, 'session_data': session_data})
+@app.route('/api/check_letter', methods=['POST'])
+def check_letter():
+    """Verificar letra (simulado sem reconhecimento)"""
+    data = request.get_json()
+    letter = data.get('letter', '').upper()
     
-    except Exception as e:
-        logger.error(f"Erro ao iniciar sessão: {e}")
-        return jsonify({'success': False, 'message': 'Erro interno do servidor'})
-
-@app.route('/api/end_session', methods=['POST'])
-def end_session():
-    """Finaliza a sessão de jogo"""
-    try:
-        if 'current_session_id' not in session:
-            return jsonify({'success': False, 'message': 'Nenhuma sessão ativa'})
-        
-        data = request.get_json()
-        stats = data.get('stats', {})
-        
-        if DATABASE_AVAILABLE and 'user_id' in session:
-            db.end_game_session(
-                session['current_session_id'],
-                stats.get('words_completed', 0),
-                stats.get('total_letters', 0),
-                stats.get('correct_letters', 0),
-                stats.get('accuracy', 0)
-            )
-        
-        del session['current_session_id']
-        return jsonify({'success': True})
+    if not current_word:
+        return jsonify({"success": False, "error": "Nenhuma palavra ativa"})
     
-    except Exception as e:
-        logger.error(f"Erro ao finalizar sessão: {e}")
-        return jsonify({'success': False, 'message': 'Erro interno do servidor'})
+    # Simulação: sempre retorna sucesso para demonstração
+    if letter in current_word:
+        return jsonify({
+            "success": True,
+            "letter": letter,
+            "word": current_word,
+            "correct": True,
+            "message": f"Correto! A letra '{letter}' está em '{current_word}'"
+        })
+    else:
+        return jsonify({
+            "success": True,
+            "letter": letter,
+            "word": current_word,
+            "correct": False,
+            "message": f"A letra '{letter}' não está em '{current_word}'"
+        })
 
-@app.route('/api/user_stats')
-def get_user_stats():
-    """Retorna estatísticas do usuário"""
-    try:
-        if 'user_id' not in session:
-            return jsonify({'success': False, 'message': 'Usuário não logado'})
-        
-        stats = {}
-        if DATABASE_AVAILABLE:
-            stats = db.get_user_statistics(session['user_id'])
-        
-        return jsonify({'success': True, 'stats': stats})
-    
-    except Exception as e:
-        logger.error(f"Erro ao buscar estatísticas: {e}")
-        return jsonify({'success': False, 'message': 'Erro interno do servidor'})
+@app.route('/api/game_status')
+def game_status():
+    """Status atual do jogo"""
+    return jsonify({
+        "active": game_active,
+        "word": current_word if game_active else "",
+        "mode": current_mode,
+        "score": score,
+        "completed_words": len(words_completed),
+        "recognition_enabled": RECOGNITION_ENABLED
+    })
 
-# ===== HANDLERS DE ERRO =====
-@app.errorhandler(404)
-def not_found(error):
-    return render_template('error.html', error_code=404, error_message="Página não encontrada"), 404
-
-@app.errorhandler(500)
-def internal_error(error):
-    return render_template('error.html', error_code=500, error_message="Erro interno do servidor"), 500
-
-# ===== ROTAS PARA VÍDEOS DE DEMONSTRAÇÃO =====
+# ===== ROTAS DE VÍDEO =====
 @app.route('/videos/<letra>')
 def serve_video(letra):
-    """Serve vídeos de demonstração das letras"""
+    """Servir vídeos de demonstração"""
     try:
-        # Validar letra (apenas A-Z)
         letra = letra.upper()
-        if len(letra) != 1 or not letra.isalpha():
+        video_path = get_video_path(letra)
+        
+        if video_path and os.path.exists(video_path):
+            return send_file(video_path, mimetype='video/mp4')
+        else:
+            logger.warning(f"Vídeo não encontrado para letra: {letra}")
             abort(404)
-        
-        # Construir caminho do vídeo
-        video_filename = f"Letra_{letra}.mp4"
-        video_path = os.path.join('Videos', video_filename)
-        
-        # Verificar se o arquivo existe
-        if not os.path.exists(video_path):
-            logger.warning(f"Vídeo não encontrado: {video_path}")
-            abort(404)
-        
-        return send_file(video_path, mimetype='video/mp4')
-    
     except Exception as e:
-        logger.error(f"Erro ao servir vídeo {letra}: {e}")
+        logger.error(f"Erro ao servir vídeo para letra {letra}: {e}")
         abort(500)
 
 @app.route('/api/get_video_demo/<letra>')
-def get_video_demo_info(letra):
-    """Retorna informações sobre o vídeo de demonstração de uma letra"""
+def get_video_demo(letra):
+    """API para obter demonstração em vídeo"""
     try:
         letra = letra.upper()
-        if len(letra) != 1 or not letra.isalpha():
-            return jsonify({"success": False, "message": "Letra inválida"}), 400
+        video_path = get_video_path(letra)
         
-        video_filename = f"Letra_{letra}.mp4"
-        video_path = os.path.join('Videos', video_filename)
-        
-        if os.path.exists(video_path):
+        if video_path and os.path.exists(video_path):
+            video_url = url_for('serve_video', letra=letra)
             return jsonify({
                 "success": True,
-                "letter": letra,
-                "video_url": f"/videos/{letra}",
-                "video_available": True
+                "video_url": video_url,
+                "letra": letra
             })
         else:
             return jsonify({
-                "success": True,
-                "letter": letra,
-                "video_available": False,
-                "message": f"Vídeo não disponível para a letra {letra}"
+                "success": False,
+                "error": f"Vídeo não encontrado para a letra {letra}"
             })
-    
     except Exception as e:
-        logger.error(f"Erro ao obter info do vídeo {letra}: {e}")
-        return jsonify({"success": False, "message": "Erro interno"}), 500
+        logger.error(f"Erro na API de vídeo para letra {letra}: {e}")
+        return jsonify({
+            "success": False,
+            "error": f"Erro interno: {e}"
+        })
+
+# ===== ROTAS DE SISTEMA =====
+@app.route('/api/logout', methods=['POST'])
+def logout():
+    """Logout do usuário"""
+    username = session.get('username', 'Usuário')
+    session.clear()
+    logger.info(f"Usuário deslogado: {username}")
+    return jsonify({"success": True, "message": "Logout realizado com sucesso"})
+
+@app.route('/health')
+def health_check():
+    """Health check para monitoramento"""
+    return jsonify({
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "recognition_enabled": RECOGNITION_ENABLED,
+        "database_available": DATABASE_AVAILABLE,
+        "words_available": WORDS_AVAILABLE
+    })
+
+# ===== TRATAMENTO DE ERROS =====
+@app.errorhandler(404)
+def not_found(error):
+    return render_template('error.html', error="Página não encontrada"), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    return render_template('error.html', error="Erro interno do servidor"), 500
 
 # ===== INICIALIZAÇÃO =====
 if __name__ == '__main__':
