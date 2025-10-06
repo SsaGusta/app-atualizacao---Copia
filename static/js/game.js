@@ -369,6 +369,12 @@ class LibrasGame {
         this.elements.soletracaoModeContent.classList.add('d-none');
         this.elements.desafioModeContent.classList.add('d-none');
         
+        // Hide timer card (normal mode doesn't use timer)
+        const timerCard = document.getElementById('timerCard');
+        if (timerCard) {
+            timerCard.style.display = 'none';
+        }
+        
         // Clear any word-related state since this is free recognition
         this.gameState.currentWord = '';
         this.gameState.currentLetterIndex = 0;
@@ -395,6 +401,12 @@ class LibrasGame {
         this.elements.normalModeContent.classList.add('d-none');
         this.elements.soletracaoModeContent.classList.remove('d-none');
         this.elements.desafioModeContent.classList.add('d-none');
+        
+        // Show timer card
+        const timerCard = document.getElementById('timerCard');
+        if (timerCard) {
+            timerCard.style.display = 'block';
+        }
         
         // Reset game state for soletracao
         this.gameState.currentLetterIndex = 0;
@@ -428,6 +440,12 @@ class LibrasGame {
         this.elements.soletracaoModeContent.classList.add('d-none');
         this.elements.desafioModeContent.classList.remove('d-none');
         
+        // Show timer card
+        const timerCard = document.getElementById('timerCard');
+        if (timerCard) {
+            timerCard.style.display = 'block';
+        }
+        
         // Reset game state for challenge (word already set from API call)
         this.gameState.currentLetterIndex = 0;
         this.gameState.currentWordIndex = 1;
@@ -458,6 +476,12 @@ class LibrasGame {
         // Update button states
         this.elements.startGameBtn.classList.remove('d-none');
         this.elements.stopGameBtn.classList.add('d-none');
+        
+        // Hide timer card
+        const timerCard = document.getElementById('timerCard');
+        if (timerCard) {
+            timerCard.style.display = 'none';
+        }
         
         // Stop camera
         if (window.CameraManager) {
@@ -591,6 +615,14 @@ class LibrasGame {
                     timerElement.className = 'h3 mb-0 text-warning';
                 } else {
                     timerElement.className = 'h3 mb-0 text-success';
+                }
+                
+                // Update the seconds label
+                const secondsLabel = timerElement.nextElementSibling;
+                if (secondsLabel && this.gameState.timeRemaining === 1) {
+                    secondsLabel.textContent = 'segundo';
+                } else if (secondsLabel) {
+                    secondsLabel.textContent = 'segundos';
                 }
             }
         } else {
