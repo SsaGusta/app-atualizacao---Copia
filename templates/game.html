@@ -9,11 +9,13 @@
     background: #000;
     border-radius: 10px;
     overflow: hidden;
+    min-height: 450px; /* Altura mínima para melhor visualização */
 }
 
 #videoElement {
     width: 100%;
-    height: auto;
+    height: 450px; /* Aumentado de auto para altura fixa maior */
+    object-fit: cover; /* Manter proporção da imagem */
     display: block;
 }
 
@@ -49,13 +51,6 @@
     width: 120px;
     height: 120px;
     margin: 0 auto;
-}
-
-.recognition-feedback {
-    min-height: 80px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
 }
 
 .word-progress {
@@ -136,6 +131,27 @@ html {
 
 .auto-scroll-target {
     animation: subtle-highlight 2s ease-in-out;
+}
+
+/* Responsividade da câmera para diferentes tamanhos de tela */
+@media (max-width: 768px) {
+    #videoElement {
+        height: 300px; /* Menor em telas pequenas */
+    }
+    
+    .camera-container {
+        min-height: 300px;
+    }
+}
+
+@media (min-width: 1200px) {
+    #videoElement {
+        height: 500px; /* Maior em telas grandes */
+    }
+    
+    .camera-container {
+        min-height: 500px;
+    }
 }
 </style>
 {% endblock %}
@@ -231,15 +247,6 @@ html {
                         <div>FPS: <span id="fpsCounter">0</span></div>
                         <div>Confiança: <span id="confidenceDisplay">0%</span></div>
                     </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Recognition Feedback -->
-        <div class="card">
-            <div class="card-body recognition-feedback">
-                <div id="recognitionResult" class="text-center">
-                    <h3 class="text-muted">Inicie o jogo para começar</h3>
                 </div>
             </div>
         </div>
