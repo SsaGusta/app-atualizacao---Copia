@@ -281,8 +281,9 @@ class LibrasGame {
         // Tentar inicializar câmera de forma não-bloqueante
         setTimeout(async () => {
             try {
-                if (window.cameraManager) {
-                    await window.cameraManager.init();
+                if (window.CameraManager) {
+                    await window.CameraManager.start();
+                    console.log('Câmera inicializada com sucesso');
                 } else {
                     console.log('CameraManager não disponível');
                 }

@@ -20,6 +20,9 @@ class CameraManager {
         
         if (this.canvasElement) {
             this.context = this.canvasElement.getContext('2d');
+            // Set canvas size to match video
+            this.canvasElement.width = 640;
+            this.canvasElement.height = 480;
         }
         
         this.setupFPSCounter();
@@ -332,8 +335,8 @@ class CameraManager {
 
         // Update recognition result display
         const resultElement = document.getElementById('recognitionResult');
-        if (resultElement && window.gameState && window.gameState.isActive) {
-            const mode = window.gameState.mode;
+        if (resultElement && window.gameInstance && window.gameInstance.gameState && window.gameInstance.gameState.isPlaying) {
+            const mode = window.gameInstance.gameState.mode;
             
             if (mode === 'normal') {
                 this.handleNormalModeRecognition(data, resultElement);
@@ -541,8 +544,8 @@ class VideoDemonstrationManager {
         if (!this.currentLetter) {
             console.warn('No current letter set for demonstration');
             // Try to get current letter from game state
-            if (window.LibrasGame && window.LibrasGame.getCurrentLetter()) {
-                this.currentLetter = window.LibrasGame.getCurrentLetter();
+            if (window.gameInstance && window.gameInstance.getCurrentLetter) {
+                this.currentLetter = window.gameInstance.getCurrentLetter();
                 console.log('Got current letter from game:', this.currentLetter);
             } else {
                 // For testing, use 'A' as default
@@ -626,13 +629,19 @@ class VideoDemonstrationManager {
 const VideoDemoManager = new VideoDemonstrationManager();
 
 // Create global instance
-const CameraManager = new CameraManager();
+const cameraManagerInstance = new CameraManager();
+
+// Initialize camera manager when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    cameraManagerInstance.init();
+    console.log('CameraManager initialized');
+});
 
 // Cleanup on page unload
 window.addEventListener('beforeunload', () => {
-    CameraManager.cleanup();
+    cameraManagerInstance.cleanup();
 });
 
 // Export for use in other scripts
-window.CameraManager = CameraManager;
+window.CameraManager = cameraManagerInstance;
 window.VideoDemoManager = VideoDemoManager;
