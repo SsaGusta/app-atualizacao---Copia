@@ -24,7 +24,7 @@ class LibrasGame {
 
     initializeElements() {
         // Game control elements
-        this.elements.modeSelect = document.getElementById('modeSelect');
+        this.elements.modeSelect = document.getElementById('gameModeSelect');
         this.elements.difficultySelect = document.getElementById('difficultySelect');
         this.elements.startGameBtn = document.getElementById('startGameBtn');
         this.elements.stopGameBtn = document.getElementById('stopGameBtn');
@@ -96,6 +96,9 @@ class LibrasGame {
 
         // Setup demo button callbacks
         this.setupDemoCallbacks();
+        
+        // Initialize with default mode
+        this.changeMode('normal');
     }
 
     setupDemoCallbacks() {
@@ -117,17 +120,29 @@ class LibrasGame {
         this.elements.desafioModeContent.classList.add('d-none');
         this.elements.customWordContainer.classList.add('d-none');
 
+        // Update mode description
+        const modeDescription = document.getElementById('modeDescription');
+        
         // Show appropriate content based on mode
         switch (mode) {
             case 'normal':
                 this.elements.normalModeContent.classList.remove('d-none');
+                if (modeDescription) {
+                    modeDescription.textContent = 'Reconhecimento livre em tempo real - pratique sinais livremente';
+                }
                 break;
             case 'soletracao':
                 this.elements.soletracaoModeContent.classList.remove('d-none');
                 this.elements.customWordContainer.classList.remove('d-none');
+                if (modeDescription) {
+                    modeDescription.textContent = 'Digite uma palavra personalizada para soletrar letra por letra';
+                }
                 break;
             case 'desafio':
                 this.elements.desafioModeContent.classList.remove('d-none');
+                if (modeDescription) {
+                    modeDescription.textContent = 'Soletração com tempo limite - teste sua velocidade!';
+                }
                 break;
         }
 
@@ -195,57 +210,59 @@ class LibrasGame {
                 this.elements.gameContent.style.display = 'block';
             }
 
-            // Get selected mode and difficulty
-            const mode = this.elements.difficultySelect ? this.elements.difficultySelect.value : 'iniciante';
-            this.gameState.difficulty = mode;
-
-            // Call backend API to start game
-            const response = await fetch('/api/start_game', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ 
-                    mode: mode 
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(`Erro HTTP: ${response.status}`);
-            }
-
-            const data = await response.json();
+            // Get selected mode and difficulty correctly
+            const selectedMode = this.elements.modeSelect ? this.elements.modeSelect.value : 'normal';
+            const selectedDifficulty = this.elements.difficultySelect ? this.elements.difficultySelect.value : 'iniciante';
             
-            if (data.success) {
-                this.gameState.currentWord = data.word;
-                this.gameState.mode = data.mode;
-                
-                console.log('Jogo iniciado:', data);
-                
-                // Start appropriate game mode
-                switch (this.gameState.mode) {
-                    case 'iniciante':
-                        await this.startDesafioMode();
-                        break;
-                    case 'avancado':
-                        await this.startSoletracaoMode();
-                        break;
-                    case 'expert':
-                        await this.startDesafioMode();
-                        break;
-                    default:
-                        await this.startNormalMode();
-                }
+            this.gameState.mode = selectedMode;
+            this.gameState.difficulty = selectedDifficulty;
 
-                // Initialize camera (opcional)
-                this.initializeCamera();
-                
-                showAlert(data.message || `Jogo iniciado! Palavra: ${data.word}`, 'success');
-                
-            } else {
-                throw new Error(data.error || 'Erro desconhecido ao iniciar jogo');
+            console.log('Mode:', selectedMode, 'Difficulty:', selectedDifficulty);
+
+            // Handle different modes
+            switch (selectedMode) {
+                case 'normal':
+                    await this.startNormalMode();
+                    break;
+                case 'soletracao':
+                    if (!this.gameState.currentWord) {
+                        throw new Error('Para o modo Soletração, primeiro valide uma palavra personalizada!');
+                    }
+                    await this.startSoletracaoMode();
+                    break;
+                case 'desafio':
+                    // Call backend API to get a random word for challenge
+                    const response = await fetch('/api/start_game', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ 
+                            mode: selectedDifficulty 
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Erro HTTP: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.gameState.currentWord = data.word;
+                        await this.startDesafioMode();
+                        showAlert(data.message || `Desafio iniciado! Palavra: ${data.word}`, 'success');
+                    } else {
+                        throw new Error(data.error || 'Erro ao buscar palavra para desafio');
+                    }
+                    break;
+                default:
+                    await this.startNormalMode();
             }
 
+            // Initialize camera (opcional)
+            this.initializeCamera();
+                
         } catch (error) {
             console.error('Error starting game:', error);
             showAlert('Erro ao iniciar jogo: ' + error.message, 'danger');
@@ -339,8 +356,13 @@ class LibrasGame {
 
     async startNormalMode() {
         console.log('Starting normal mode');
-        this.updateWordDisplay();
-        showAlert('Modo normal iniciado! Use os vídeos de demonstração', 'success');
+        
+        // Show normal mode content
+        this.elements.normalModeContent.classList.remove('d-none');
+        this.elements.soletracaoModeContent.classList.add('d-none');
+        this.elements.desafioModeContent.classList.add('d-none');
+        
+        showAlert('Modo Normal iniciado! Faça sinais com as mãos para reconhecimento livre', 'success');
     }
 
     async startSoletracaoMode() {
@@ -348,24 +370,48 @@ class LibrasGame {
             throw new Error('Palavra não definida. Valide uma palavra primeiro.');
         }
 
-        console.log('Starting soletração mode with word:', this.gameState.currentWord);
-        this.gameState.currentLetterIndex = 0;
-        this.setupWordDisplay();
-        this.updateCurrentLetter();
+        console.log('Starting soletracao mode with word:', this.gameState.currentWord);
         
-        showAlert(`Soletração iniciada! Comece com a letra "${this.getCurrentLetter()}"`, 'success');
+        // Show soletracao mode content
+        this.elements.normalModeContent.classList.add('d-none');
+        this.elements.soletracaoModeContent.classList.remove('d-none');
+        this.elements.desafioModeContent.classList.add('d-none');
+        
+        // Reset game state for soletracao
+        this.gameState.currentLetterIndex = 0;
+        this.gameState.correctLetters = 0;
+        this.gameState.totalLetters = this.gameState.currentWord.length;
+        
+        // Update displays
+        this.updateWordDisplay();
+        this.updateProgressDisplay();
+        
+        showAlert(`Modo Soletração iniciado! Soletre: ${this.gameState.currentWord}`, 'success');
     }
 
     async startDesafioMode() {
-        console.log('Starting desafio mode');
+        console.log('Starting desafio mode with word:', this.gameState.currentWord);
         
-        // Simple mode - use word from start_game API
+        // Show desafio mode content
+        this.elements.normalModeContent.classList.add('d-none');
+        this.elements.soletracaoModeContent.classList.add('d-none');
+        this.elements.desafioModeContent.classList.remove('d-none');
+        
+        // Reset game state for challenge
         this.gameState.currentLetterIndex = 0;
         this.gameState.currentWordIndex = 1;
-        this.setupChallengeWordDisplay();
-        this.updateCurrentLetter();
+        this.gameState.correctLetters = 0;
+        this.gameState.totalLetters = this.gameState.currentWord.length;
         
-        showAlert(`Desafio iniciado! Palavra: ${this.gameState.currentWord}`, 'success');
+        // Start timer (exemplo: 60 segundos por palavra)
+        this.gameState.timeRemaining = 60;
+        this.startTimer();
+        
+        // Update displays
+        this.updateWordDisplay();
+        this.updateProgressDisplay();
+        
+        showAlert(`Modo Desafio iniciado! Você tem 60 segundos para soletrar: ${this.gameState.currentWord}`, 'warning');
     }
 
     stopGame() {
@@ -425,6 +471,106 @@ class LibrasGame {
             
             container.appendChild(letterBox);
         }
+    }
+
+    updateProgressDisplay() {
+        // Update progress displays for different modes
+        if (this.gameState.mode === 'soletracao') {
+            if (this.elements.letterPosition) {
+                this.elements.letterPosition.textContent = this.gameState.currentLetterIndex + 1;
+            }
+            if (this.elements.totalLetters) {
+                this.elements.totalLetters.textContent = this.gameState.currentWord.length;
+            }
+        } else if (this.gameState.mode === 'desafio') {
+            if (this.elements.challengeLetterPosition) {
+                this.elements.challengeLetterPosition.textContent = this.gameState.currentLetterIndex + 1;
+            }
+            if (this.elements.challengeTotalLetters) {
+                this.elements.challengeTotalLetters.textContent = this.gameState.currentWord.length;
+            }
+            if (this.elements.challengeWordCount) {
+                this.elements.challengeWordCount.textContent = this.gameState.currentWordIndex;
+            }
+            if (this.elements.totalChallengeWords) {
+                this.elements.totalChallengeWords.textContent = this.gameState.totalWords;
+            }
+        }
+    }
+
+    startTimer() {
+        if (this.gameState.gameTimer) {
+            clearInterval(this.gameState.gameTimer);
+        }
+
+        this.gameState.gameTimer = setInterval(() => {
+            this.gameState.timeRemaining--;
+            
+            // Update timer display if exists
+            const timerElement = document.getElementById('timeRemaining');
+            if (timerElement) {
+                timerElement.textContent = this.gameState.timeRemaining;
+            }
+
+            if (this.gameState.timeRemaining <= 0) {
+                this.onTimeUp();
+            }
+        }, 1000);
+    }
+
+    onTimeUp() {
+        clearInterval(this.gameState.gameTimer);
+        showAlert('Tempo esgotado! Próxima palavra...', 'warning');
+        
+        // Move to next word or end game
+        this.nextWord();
+    }
+
+    async nextWord() {
+        this.gameState.currentWordIndex++;
+        
+        if (this.gameState.currentWordIndex > this.gameState.totalWords) {
+            this.endGame();
+            return;
+        }
+
+        // Get next word from API
+        try {
+            const response = await fetch('/api/start_game', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ 
+                    mode: this.gameState.difficulty 
+                })
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                this.gameState.currentWord = data.word;
+                this.gameState.currentLetterIndex = 0;
+                this.gameState.timeRemaining = 60; // Reset timer
+                
+                this.updateWordDisplay();
+                this.updateProgressDisplay();
+                this.startTimer();
+                
+                showAlert(`Nova palavra: ${data.word}`, 'info');
+            }
+        } catch (error) {
+            console.error('Error getting next word:', error);
+            this.endGame();
+        }
+    }
+
+    endGame() {
+        this.stopGame();
+        showAlert('Jogo finalizado! Parabéns!', 'success');
+        
+        // Could show final statistics here
+        console.log('Game ended');
     }
 
     getCurrentLetter() {
