@@ -7,7 +7,14 @@ from flask import Flask, render_template, request, jsonify, session, redirect, u
 from flask_session import Session
 import threading
 import logging
-from flask_cors import CORS
+
+# Tentar importar CORS, mas continuar se falhar
+try:
+    from flask_cors import CORS
+    CORS_AVAILABLE = True
+except ImportError:
+    CORS_AVAILABLE = False
+    print("Flask-CORS não disponível, continuando sem CORS")
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -37,13 +44,16 @@ except ImportError as e:
 
 # ===== CONFIGURAÇÃO DA APLICAÇÃO =====
 app = Flask(__name__)
-app.secret_key = 'libras_web_app_2024_secret_key'  # Mudar em produção
+app.secret_key = os.environ.get('SECRET_KEY', 'libras_web_app_2025_secret_key')
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_PERMANENT'] = False
+app.config['SESSION_FILE_DIR'] = '/tmp/sessions'
+app.config['SESSION_FILE_THRESHOLD'] = 100
 
 # Inicializar extensões
 Session(app)
-CORS(app)
+if CORS_AVAILABLE:
+    CORS(app)
 
 # ===== CONFIGURAÇÃO GLOBAL =====
 # Sistema de reconhecimento desabilitado para deploy
