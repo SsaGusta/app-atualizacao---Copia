@@ -266,12 +266,19 @@ class CameraManager {
     }
 
     startFrameProcessing() {
+        console.log('Starting frame processing...');
+        console.log('isActive:', this.isActive);
+        console.log('videoElement:', !!this.videoElement);
+        console.log('context:', !!this.context);
+        
         // Process frames at 10 FPS to reduce load
         this.processingInterval = setInterval(() => {
             if (this.isActive && this.videoElement && this.context) {
                 this.processFrame();
             }
         }, 100); // 10 FPS
+        
+        console.log('Frame processing interval started');
     }
 
     async processFrame() {
@@ -301,8 +308,18 @@ class CameraManager {
         try {
             // Only process if game is active
             if (!window.gameInstance || !window.gameInstance.gameState || !window.gameInstance.gameState.isPlaying) {
+                console.log('Game not active, skipping frame processing');
+                console.log('gameInstance:', !!window.gameInstance);
+                if (window.gameInstance) {
+                    console.log('gameState:', !!window.gameInstance.gameState);
+                    if (window.gameInstance.gameState) {
+                        console.log('isPlaying:', window.gameInstance.gameState.isPlaying);
+                    }
+                }
                 return;
             }
+
+            console.log('Sending frame for processing...');
 
             const response = await fetch('/api/process_frame', {
                 method: 'POST',
@@ -315,6 +332,7 @@ class CameraManager {
             });
 
             const data = await response.json();
+            console.log('Recognition response:', data);
 
             if (data.success) {
                 this.handleRecognitionResult(data);
