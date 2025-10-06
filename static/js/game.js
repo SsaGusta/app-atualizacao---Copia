@@ -220,10 +220,6 @@ class LibrasGame {
             console.log('Mode:', selectedMode, 'Difficulty:', selectedDifficulty);
             console.log('Expected timer duration:', this.getDifficultyTime(selectedDifficulty));
 
-            // Initialize timer display before starting any mode
-            this.gameState.timeRemaining = this.getDifficultyTime(selectedDifficulty);
-            this.updateTimerDisplay();
-
             // Handle different modes
             switch (selectedMode) {
                 case 'normal':
@@ -408,7 +404,6 @@ class LibrasGame {
         // Set timer based on difficulty
         this.gameState.timeRemaining = this.getDifficultyTime(this.gameState.difficulty);
         this.gameState.startTime = Date.now();
-        this.startTimer();
         
         console.log('After reset - Current letter index:', this.gameState.currentLetterIndex);
         console.log('First letter should be:', this.gameState.currentWord[0]);
@@ -417,6 +412,9 @@ class LibrasGame {
         // Update displays
         this.updateWordDisplay();
         this.updateProgressDisplay();
+        
+        // Start timer
+        this.startTimer();
         
         showAlert(`Modo Soletração iniciado! Soletre: ${this.gameState.currentWord} (${this.gameState.timeRemaining}s)`, 'success');
     }
@@ -439,7 +437,6 @@ class LibrasGame {
         // Set timer based on difficulty
         this.gameState.timeRemaining = this.getDifficultyTime(this.gameState.difficulty);
         this.gameState.startTime = Date.now();
-        this.startTimer();
         
         console.log('After reset - Current letter index:', this.gameState.currentLetterIndex);
         console.log('First letter should be:', this.gameState.currentWord[0]);
@@ -448,6 +445,9 @@ class LibrasGame {
         // Update displays
         this.updateWordDisplay();
         this.updateProgressDisplay();
+        
+        // Start timer
+        this.startTimer();
         
         console.log(`Desafio mode started: ${this.gameState.difficulty} - ${this.gameState.currentWord}`);
     }
@@ -564,16 +564,25 @@ class LibrasGame {
     }
 
     updateTimerDisplay() {
+        console.log('updateTimerDisplay called');
+        console.log('timeRemaining:', this.gameState.timeRemaining);
+        console.log('game mode:', this.gameState.mode);
+        
         const timerElement = document.getElementById('timeRemaining');
+        console.log('timerElement found:', !!timerElement);
+        
         if (timerElement) {
             if (this.gameState.timeRemaining <= 0 && this.gameState.mode === 'normal') {
                 // Normal mode doesn't use timer
                 timerElement.textContent = '--:--';
                 timerElement.className = 'h3 mb-0 text-muted';
+                console.log('Set timer to --:-- for normal mode');
             } else {
                 const minutes = Math.floor(this.gameState.timeRemaining / 60);
                 const seconds = this.gameState.timeRemaining % 60;
-                timerElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                const timeText = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                timerElement.textContent = timeText;
+                console.log('Set timer to:', timeText);
                 
                 // Change color based on time remaining
                 if (this.gameState.timeRemaining <= 30) {
@@ -584,6 +593,8 @@ class LibrasGame {
                     timerElement.className = 'h3 mb-0 text-success';
                 }
             }
+        } else {
+            console.error('Timer element not found!');
         }
     }
 
@@ -719,18 +730,26 @@ class LibrasGame {
     }
 
     getDifficultyTime(difficulty) {
+        console.log('getDifficultyTime called with:', difficulty);
+        let time;
         switch (difficulty) {
             case 'iniciante':
-                return 180; // 3 minutos
+                time = 180; // 3 minutos
+                break;
             case 'intermediario':
-                return 160; // 2:40 minutos
+                time = 160; // 2:40 minutos
+                break;
             case 'avancado':
-                return 100; // 1:40 minutos
+                time = 100; // 1:40 minutos
+                break;
             case 'expert':
-                return 60;  // 1 minuto
+                time = 60;  // 1 minuto
+                break;
             default:
-                return 120; // 2 minutos padrão
+                time = 120; // 2 minutos padrão
         }
+        console.log('Returning time:', time, 'for difficulty:', difficulty);
+        return time;
     }
 
     getCurrentLetter() {
