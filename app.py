@@ -2,7 +2,6 @@
 import os
 import json
 import time
-import pandas as pd
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_file, abort
 from flask_session import Session
