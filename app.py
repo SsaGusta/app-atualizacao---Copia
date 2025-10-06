@@ -165,21 +165,31 @@ def start_game():
     """Iniciar novo jogo"""
     global current_word, current_mode, game_active, score, words_completed
     
-    data = request.get_json()
-    mode = data.get('mode', 'iniciante')
-    
-    current_mode = mode
-    current_word = get_random_word(mode)
-    game_active = True
-    score = 0
-    words_completed = []
-    
-    return jsonify({
-        "success": True,
-        "word": current_word,
-        "mode": mode,
-        "recognition_enabled": RECOGNITION_ENABLED
-    })
+    try:
+        data = request.get_json()
+        mode = data.get('mode', 'iniciante') if data else 'iniciante'
+        
+        current_mode = mode
+        current_word = get_random_word(mode)
+        game_active = True
+        score = 0
+        words_completed = []
+        
+        logger.info(f"Jogo iniciado - Modo: {mode}, Palavra: {current_word}")
+        
+        return jsonify({
+            "success": True,
+            "word": current_word,
+            "mode": mode,
+            "recognition_enabled": RECOGNITION_ENABLED,
+            "message": f"Jogo iniciado no modo {mode}. Palavra: {current_word}"
+        })
+    except Exception as e:
+        logger.error(f"Erro ao iniciar jogo: {e}")
+        return jsonify({
+            "success": False,
+            "error": f"Erro ao iniciar jogo: {e}"
+        })
 
 @app.route('/api/next_word', methods=['POST'])
 def next_word():
@@ -205,29 +215,80 @@ def next_word():
 @app.route('/api/check_letter', methods=['POST'])
 def check_letter():
     """Verificar letra (simulado sem reconhecimento)"""
-    data = request.get_json()
-    letter = data.get('letter', '').upper()
-    
-    if not current_word:
-        return jsonify({"success": False, "error": "Nenhuma palavra ativa"})
-    
-    # Simulação: sempre retorna sucesso para demonstração
-    if letter in current_word:
-        return jsonify({
-            "success": True,
-            "letter": letter,
-            "word": current_word,
-            "correct": True,
-            "message": f"Correto! A letra '{letter}' está em '{current_word}'"
-        })
-    else:
-        return jsonify({
-            "success": True,
-            "letter": letter,
-            "word": current_word,
-            "correct": False,
-            "message": f"A letra '{letter}' não está em '{current_word}'"
-        })
+    try:
+        data = request.get_json()
+        letter = data.get('letter', '').upper()
+        
+        if not current_word:
+            return jsonify({"success": False, "error": "Nenhuma palavra ativa"})
+        
+        # Simulação: sempre retorna sucesso para demonstração
+        if letter in current_word:
+            return jsonify({
+                "success": True,
+                "letter": letter,
+                "word": current_word,
+                "correct": True,
+                "message": f"Correto! A letra '{letter}' está em '{current_word}'"
+            })
+        else:
+            return jsonify({
+                "success": True,
+                "letter": letter,
+                "word": current_word,
+                "correct": False,
+                "message": f"A letra '{letter}' não está em '{current_word}'"
+            })
+    except Exception as e:
+        logger.error(f"Erro em check_letter: {e}")
+        return jsonify({"success": False, "error": f"Erro interno: {e}"})
+
+@app.route('/api/validate_word', methods=['POST'])
+def validate_word():
+    """Validar palavra completa (simulado)"""
+    try:
+        data = request.get_json()
+        user_word = data.get('word', '').upper()
+        
+        if not current_word:
+            return jsonify({"success": False, "error": "Nenhuma palavra ativa"})
+        
+        # Simulação: sempre aceita como correto para demonstração
+        correct = user_word == current_word
+        
+        if correct:
+            global score, words_completed
+            score += 10
+            words_completed.append(current_word)
+            
+            return jsonify({
+                "success": True,
+                "correct": True,
+                "word": current_word,
+                "score": score,
+                "message": f"Parabéns! Você completou '{current_word}' corretamente!"
+            })
+        else:
+            return jsonify({
+                "success": True,
+                "correct": False,
+                "word": current_word,
+                "expected": current_word,
+                "received": user_word,
+                "message": f"Palavra incorreta. Era '{current_word}', você fez '{user_word}'"
+            })
+    except Exception as e:
+        logger.error(f"Erro em validate_word: {e}")
+        return jsonify({"success": False, "error": f"Erro interno: {e}"})
+
+@app.route('/api/camera_status')
+def camera_status():
+    """Status da câmera (sempre desabilitada no deploy)"""
+    return jsonify({
+        "available": False,
+        "enabled": False,
+        "message": "Câmera não disponível nesta versão de demonstração"
+    })
 
 @app.route('/api/game_status')
 def game_status():
