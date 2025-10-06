@@ -218,10 +218,18 @@ class LibrasGame {
             this.gameState.difficulty = selectedDifficulty;
 
             console.log('Mode:', selectedMode, 'Difficulty:', selectedDifficulty);
+            console.log('Expected timer duration:', this.getDifficultyTime(selectedDifficulty));
+
+            // Initialize timer display before starting any mode
+            this.gameState.timeRemaining = this.getDifficultyTime(selectedDifficulty);
+            this.updateTimerDisplay();
 
             // Handle different modes
             switch (selectedMode) {
                 case 'normal':
+                    // Normal mode doesn't use timer
+                    this.gameState.timeRemaining = 0;
+                    this.updateTimerDisplay();
                     await this.startNormalMode();
                     break;
                 case 'soletracao':
@@ -368,6 +376,10 @@ class LibrasGame {
         // Clear any word-related state since this is free recognition
         this.gameState.currentWord = '';
         this.gameState.currentLetterIndex = 0;
+        this.gameState.timeRemaining = 0; // No timer for normal mode
+        
+        // Update timer display to show no timer
+        this.updateTimerDisplay();
         
         // Initialize camera for letter recognition
         this.initializeCamera();
@@ -461,8 +473,8 @@ class LibrasGame {
         // Reset timer display
         const timerElement = document.getElementById('timeRemaining');
         if (timerElement) {
-            timerElement.textContent = '0:00';
-            timerElement.className = 'h3 mb-0';
+            timerElement.textContent = '--:--';
+            timerElement.className = 'h3 mb-0 text-muted';
         }
 
         showAlert('Jogo parado', 'info');
@@ -554,17 +566,23 @@ class LibrasGame {
     updateTimerDisplay() {
         const timerElement = document.getElementById('timeRemaining');
         if (timerElement) {
-            const minutes = Math.floor(this.gameState.timeRemaining / 60);
-            const seconds = this.gameState.timeRemaining % 60;
-            timerElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-            
-            // Change color based on time remaining
-            if (this.gameState.timeRemaining <= 30) {
-                timerElement.className = 'h3 mb-0 text-danger';
-            } else if (this.gameState.timeRemaining <= 60) {
-                timerElement.className = 'h3 mb-0 text-warning';
+            if (this.gameState.timeRemaining <= 0 && this.gameState.mode === 'normal') {
+                // Normal mode doesn't use timer
+                timerElement.textContent = '--:--';
+                timerElement.className = 'h3 mb-0 text-muted';
             } else {
-                timerElement.className = 'h3 mb-0 text-success';
+                const minutes = Math.floor(this.gameState.timeRemaining / 60);
+                const seconds = this.gameState.timeRemaining % 60;
+                timerElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                
+                // Change color based on time remaining
+                if (this.gameState.timeRemaining <= 30) {
+                    timerElement.className = 'h3 mb-0 text-danger';
+                } else if (this.gameState.timeRemaining <= 60) {
+                    timerElement.className = 'h3 mb-0 text-warning';
+                } else {
+                    timerElement.className = 'h3 mb-0 text-success';
+                }
             }
         }
     }
