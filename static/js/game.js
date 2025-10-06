@@ -386,6 +386,11 @@ class LibrasGame {
         // Initialize camera for letter recognition
         this.initializeCamera();
         
+        // Scroll to game area for better visibility
+        setTimeout(() => {
+            this.scrollToGameArea();
+        }, 300); // Small delay to ensure elements are rendered
+        
         showAlert('Modo Reconhecimento Normal iniciado! Faça sinais com as mãos e veja o reconhecimento em tempo real', 'success');
     }
 
@@ -428,6 +433,11 @@ class LibrasGame {
         // Start timer
         this.startTimer();
         
+        // Scroll to game area for better visibility
+        setTimeout(() => {
+            this.scrollToGameArea();
+        }, 300); // Small delay to ensure elements are rendered
+        
         showAlert(`Modo Soletração iniciado! Soletre: ${this.gameState.currentWord} (${this.gameState.timeRemaining}s)`, 'success');
     }
 
@@ -466,6 +476,11 @@ class LibrasGame {
         
         // Start timer
         this.startTimer();
+        
+        // Scroll to game area for better visibility
+        setTimeout(() => {
+            this.scrollToGameArea();
+        }, 300); // Small delay to ensure elements are rendered
         
         console.log(`Desafio mode started: ${this.gameState.difficulty} - ${this.gameState.currentWord}`);
     }
@@ -585,6 +600,62 @@ class LibrasGame {
                 this.onTimeUp();
             }
         }, 1000);
+    }
+
+    // Função para fazer scroll automático até os elementos importantes do jogo
+    scrollToGameArea() {
+        // Identificar os elementos principais que devem estar visíveis
+        const gameContent = document.getElementById('gameContent');
+        const videoElement = document.getElementById('videoElement');
+        const timerCard = document.getElementById('timerCard');
+        
+        // Definir qual elemento usar como referência baseado no modo
+        let targetElement = null;
+        
+        if (this.gameState.mode === 'normal') {
+            // Para modo normal, focar na câmera
+            targetElement = videoElement ? videoElement.parentElement : gameContent;
+        } else {
+            // Para modos com palavra (soletração/desafio), focar no conteúdo do jogo
+            targetElement = gameContent;
+        }
+        
+        if (targetElement) {
+            // Calcular a posição ideal considerando diferentes elementos
+            const elementRect = targetElement.getBoundingClientRect();
+            const currentScrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            const elementTop = elementRect.top + currentScrollTop;
+            
+            // Calcular offset baseado no tamanho da janela
+            const viewportHeight = window.innerHeight;
+            const offset = Math.min(150, viewportHeight * 0.1); // 10% da altura da viewport ou 150px, o que for menor
+            
+            const targetPosition = elementTop - offset;
+            
+            // Adicionar classe de destaque visual temporário
+            targetElement.classList.add('auto-scroll-target');
+            
+            // Fazer scroll suave até a posição calculada
+            window.scrollTo({
+                top: Math.max(0, targetPosition), // Garantir que não role para posição negativa
+                behavior: 'smooth'
+            });
+            
+            // Remover a classe de destaque após a animação
+            setTimeout(() => {
+                targetElement.classList.remove('auto-scroll-target');
+            }, 2000);
+            
+            console.log('Scroll automático executado:', {
+                mode: this.gameState.mode,
+                elementTop: elementTop,
+                offset: offset,
+                targetPosition: targetPosition,
+                viewportHeight: viewportHeight
+            });
+        } else {
+            console.warn('Elemento alvo para scroll não encontrado');
+        }
     }
 
     updateTimerDisplay() {

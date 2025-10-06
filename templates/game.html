@@ -112,6 +112,31 @@
     25% { transform: translateX(-5px); }
     75% { transform: translateX(5px); }
 }
+
+/* Smooth scrolling behavior for the entire page */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Enhanced focus effect for game area during scroll */
+.game-content-focus {
+    box-shadow: 0 0 20px rgba(0, 123, 255, 0.3);
+    transition: box-shadow 0.3s ease;
+}
+
+/* Subtle highlight animation for important elements */
+@keyframes subtle-highlight {
+    0%, 100% { 
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+    }
+    50% { 
+        box-shadow: 0 4px 12px rgba(0, 123, 255, 0.2); 
+    }
+}
+
+.auto-scroll-target {
+    animation: subtle-highlight 2s ease-in-out;
+}
 </style>
 {% endblock %}
 
