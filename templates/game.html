@@ -282,7 +282,7 @@
                         </small>
                     </div>
                     <div class="mt-3">
-                        <button class="btn btn-info btn-sm" id="showDemoBtn" onclick="(() => { const letter = getCurrentLetter(); window.showVideoDemo(letter || 'A'); })()">
+                        <button class="btn btn-info btn-sm" id="showDemoBtn" onclick="showCurrentLetterDemo()">
                             <i class="fas fa-play-circle"></i> Ver Demonstração
                         </button>
                     </div>
@@ -309,7 +309,7 @@
                         </div>
                     </div>
                     <div class="mt-3 text-center">
-                        <button class="btn btn-info btn-sm" id="showChallengeDemoBtn" onclick="(() => { const letter = getCurrentLetter(); window.showVideoDemo(letter || 'A'); })()">
+                        <button class="btn btn-info btn-sm" id="showChallengeDemoBtn" onclick="showCurrentLetterDemo()">
                             <i class="fas fa-play-circle"></i> Ver Demonstração
                         </button>
                     </div>
@@ -453,10 +453,26 @@ function setupDemoButtons() {
 }
 
 function getCurrentLetter() {
-    if (gameState.currentWord && gameState.currentLetterIndex < gameState.currentWord.length) {
-        return gameState.currentWord[gameState.currentLetterIndex];
+    // Acessar a instância global do jogo
+    if (window.gameInstance && window.gameInstance.gameState) {
+        const gameState = window.gameInstance.gameState;
+        if (gameState.currentWord && gameState.currentLetterIndex < gameState.currentWord.length) {
+            return gameState.currentWord[gameState.currentLetterIndex];
+        }
     }
     return 'A'; // Default letter for demo
+}
+
+function showCurrentLetterDemo() {
+    const currentLetter = getCurrentLetter();
+    console.log('Showing demo for letter:', currentLetter);
+    
+    if (window.showVideoDemo) {
+        window.showVideoDemo(currentLetter);
+    } else {
+        console.error('showVideoDemo function not available');
+        alert(`Demonstração da letra: ${currentLetter}`);
+    }
 }
 
 console.log('Game scripts loaded successfully');

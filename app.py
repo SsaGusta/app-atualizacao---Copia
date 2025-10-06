@@ -254,38 +254,35 @@ def check_letter():
 
 @app.route('/api/validate_word', methods=['POST'])
 def validate_word():
-    """Validar palavra completa (simulado)"""
+    """Validar palavra customizada para modo soletração"""
     try:
         data = request.get_json()
-        user_word = data.get('word', '').upper()
+        word = data.get('word', '').strip().upper()
         
-        if not current_word:
-            return jsonify({"success": False, "error": "Nenhuma palavra ativa"})
+        if not word:
+            return jsonify({"success": False, "message": "Palavra não pode estar vazia"})
         
-        # Simulação: sempre aceita como correto para demonstração
-        correct = user_word == current_word
+        # Validar se contém apenas letras
+        if not word.isalpha():
+            return jsonify({"success": False, "message": "Use apenas letras de A-Z"})
         
-        if correct:
-            global score, words_completed
-            score += 10
-            words_completed.append(current_word)
-            
-            return jsonify({
-                "success": True,
-                "correct": True,
-                "word": current_word,
-                "score": score,
-                "message": f"Parabéns! Você completou '{current_word}' corretamente!"
-            })
-        else:
-            return jsonify({
-                "success": True,
-                "correct": False,
-                "word": current_word,
-                "expected": current_word,
-                "received": user_word,
-                "message": f"Palavra incorreta. Era '{current_word}', você fez '{user_word}'"
-            })
+        # Validar tamanho
+        if len(word) > 20:
+            return jsonify({"success": False, "message": "Palavra muito longa (máximo 20 letras)"})
+        
+        if len(word) < 2:
+            return jsonify({"success": False, "message": "Palavra muito curta (mínimo 2 letras)"})
+        
+        # Palavra válida - armazenar globalmente para uso posterior
+        global current_word
+        current_word = word
+        
+        return jsonify({
+            "success": True,
+            "word": word,
+            "message": f"Palavra '{word}' validada com sucesso! Clique em 'Iniciar' para começar a soletração."
+        })
+        
     except Exception as e:
         logger.error(f"Erro em validate_word: {e}")
         return jsonify({"success": False, "error": f"Erro interno: {e}"})
