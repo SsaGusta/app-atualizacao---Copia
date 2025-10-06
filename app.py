@@ -5,9 +5,6 @@ import time
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_file, abort
 from flask_session import Session
-import base64
-from io import BytesIO
-from PIL import Image
 import threading
 import logging
 from flask_cors import CORS
