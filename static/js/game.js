@@ -359,36 +359,13 @@ class LibrasGame {
     async startDesafioMode() {
         console.log('Starting desafio mode');
         
-        try {
-            // Get random word from server
-            const response = await fetch('/api/start_session', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    mode: 'desafio',
-                    difficulty: this.gameState.difficulty
-                })
-            });
-
-            const result = await response.json();
-            
-            if (result.success) {
-                this.gameState.currentWord = result.word;
-                this.gameState.currentLetterIndex = 0;
-                this.gameState.currentWordIndex = 1;
-                this.setupChallengeWordDisplay();
-                this.updateCurrentLetter();
-                
-                showAlert(`Desafio iniciado! Palavra: ${this.gameState.currentWord}`, 'success');
-            } else {
-                throw new Error(result.message || 'Erro ao iniciar desafio');
-            }
-        } catch (error) {
-            console.error('Error starting challenge:', error);
-            throw error;
-        }
+        // Simple mode - use word from start_game API
+        this.gameState.currentLetterIndex = 0;
+        this.gameState.currentWordIndex = 1;
+        this.setupChallengeWordDisplay();
+        this.updateCurrentLetter();
+        
+        showAlert(`Desafio iniciado! Palavra: ${this.gameState.currentWord}`, 'success');
     }
 
     stopGame() {
@@ -545,14 +522,14 @@ class LibrasGame {
 
     async getNextChallengeWord() {
         try {
-            const response = await fetch('/api/start_session', {
+            // Call start_game API to get a new word
+            const response = await fetch('/api/start_game', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    mode: 'desafio',
-                    difficulty: this.gameState.difficulty
+                    mode: this.gameState.difficulty
                 })
             });
 
