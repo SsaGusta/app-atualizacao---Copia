@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+
+{% block title %}Estatísticas - Libras Learning{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>
+                <i class="fas fa-chart-line text-primary"></i>
+                Minhas Estatísticas
+            </h2>
+            <a href="{{ url_for('game') }}" class="btn btn-primary">
+                <i class="fas fa-play"></i> Voltar ao Jogo
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row mb-4">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card stat-card text-center">
+            <div class="card-body">
+                <i class="fas fa-trophy fa-2x text-warning mb-2"></i>
+                <div class="stat-number">{{ stats.get('total_sessions', 0) }}</div>
+                <h6 class="text-muted">Sessões Jogadas</h6>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card stat-card text-center">
+            <div class="card-body">
+                <i class="fas fa-spell-check fa-2x text-success mb-2"></i>
+                <div class="stat-number">{{ stats.get('total_words', 0) }}</div>
+                <h6 class="text-muted">Palavras Completadas</h6>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card stat-card text-center">
+            <div class="card-body">
+                <i class="fas fa-percentage fa-2x text-primary mb-2"></i>
+                <div class="stat-number">{{ "%.1f"|format(stats.get('avg_accuracy', 0)) }}%</div>
+                <h6 class="text-muted">Precisão Média</h6>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card stat-card text-center">
+            <div class="card-body">
+                <i class="fas fa-clock fa-2x text-info mb-2"></i>
+                <div class="stat-number">{{ stats.get('total_time_formatted', '00:00') }}</div>
+                <h6 class="text-muted">Tempo Total</h6>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Detailed Statistics -->
+<div class="row">
+    <!-- Recent Sessions -->
+    <div class="col-lg-8 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-history"></i> Sessões Recentes
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if stats.get('recent_sessions') %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Dificuldade</th>
+                                <th>Palavras</th>
+                                <th>Precisão</th>
+                                <th>Duração</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for session in stats.recent_sessions %}
+                            <tr>
+                                <td>
+                                    <small>{{ session.date }}</small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{{ 'primary' if session.difficulty == 'iniciante' else 'success' if session.difficulty == 'intermediario' else 'warning' if session.difficulty == 'avancado' else 'danger' }}">
+                                        {{ session.difficulty|title }}
+                                    </span>
+                                </td>
+                                <td>{{ session.words_completed }}</td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        {{ "%.1f"|format(session.accuracy) }}%
+                                        <div class="progress ms-2" style="width: 60px; height: 8px;">
+                                            <div class="progress-bar bg-{{ 'success' if session.accuracy >= 80 else 'warning' if session.accuracy >= 60 else 'danger' }}" 
+                                                 style="width: {{ session.accuracy }}%"></div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>{{ session.duration }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-chart-line fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">Nenhuma sessão encontrada</h5>
+                    <p class="text-muted">Comece a jogar para ver suas estatísticas aqui!</p>
+                    <a href="{{ url_for('game') }}" class="btn btn-primary">
+                        <i class="fas fa-play"></i> Começar a Jogar
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Letter Performance -->
+    <div class="col-lg-4 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-font"></i> Performance por Letra
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if stats.get('letter_performance') %}
+                <div style="max-height: 400px; overflow-y: auto;">
+                    {% for letter in stats.letter_performance %}
+                    <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded">
+                        <div class="d-flex align-items-center">
+                            <span class="badge bg-primary me-2">{{ letter.letter }}</span>
+                            <small class="text-muted">{{ letter.attempts }} tentativas</small>
+                        </div>
+                        <div class="text-end">
+                            <div class="fw-bold">{{ "%.1f"|format(letter.accuracy) }}%</div>
+                            <small class="text-muted">{{ "%.1f"|format(letter.avg_time) }}s</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-3">
+                    <i class="fas fa-hand-paper fa-2x text-muted mb-2"></i>
+                    <p class="text-muted mb-0">Dados de letras aparecerão após jogar</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Progress Charts -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-area"></i> Progresso ao Longo do Tempo
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if stats.get('progress_data') %}
+                <canvas id="progressChart" width="400" height="100"></canvas>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-chart-area fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">Gráfico de progresso aparecerá aqui</h5>
+                    <p class="text-muted">Continue jogando para ver sua evolução ao longo do tempo!</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if stats.get('progress_data') %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Progress Chart
+    const ctx = document.getElementById('progressChart').getContext('2d');
+    const progressData = {{ stats.progress_data | tojson | safe }};
+    
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: progressData.labels,
+            datasets: [{
+                label: 'Precisão (%)',
+                data: progressData.accuracy,
+                borderColor: '#007bff',
+                backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                fill: true,
+                tension: 0.4
+            }, {
+                label: 'Palavras Completadas',
+                data: progressData.words,
+                borderColor: '#28a745',
+                backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                fill: true,
+                tension: 0.4,
+                yAxisID: 'y1'
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Evolução da Performance'
+                },
+                legend: {
+                    position: 'top'
+                }
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'Precisão (%)'
+                    },
+                    min: 0,
+                    max: 100
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Palavras'
+                    },
+                    grid: {
+                        drawOnChartArea: false,
+                    },
+                }
+            }
+        }
+    });
+});
+</script>
+{% endif %}
+
+<script>
+// Refresh statistics periodically
+setInterval(async function() {
+    try {
+        const response = await fetch('/api/user_stats');
+        const data = await response.json();
+        
+        if (data.success && data.stats) {
+            // Update summary cards
+            const elements = {
+                'total_sessions': data.stats.total_sessions || 0,
+                'total_words': data.stats.total_words || 0,
+                'avg_accuracy': (data.stats.avg_accuracy || 0).toFixed(1) + '%',
+                'total_time_formatted': data.stats.total_time_formatted || '00:00'
+            };
+            
+            Object.keys(elements).forEach(key => {
+                const element = document.querySelector(`[data-stat="${key}"]`);
+                if (element) {
+                    element.textContent = elements[key];
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Erro ao atualizar estatísticas:', error);
+    }
+}, 30000); // Update every 30 seconds
+</script>
+{% endblock %}

@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}Libras Learning - Início{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <!-- Hero Section -->
+        <div class="text-center mb-5">
+            <h1 class="display-4 text-primary mb-3">
+                <i class="fas fa-hands"></i> Libras Learning
+            </h1>
+            <p class="lead">Aprenda Libras de forma interativa usando inteligência artificial</p>
+            <p class="text-muted">
+                Pratique sinais de letras e palavras com reconhecimento em tempo real através da sua câmera
+            </p>
+        </div>
+
+        <!-- Features -->
+        <div class="row mb-5">
+            <div class="col-md-4 text-center mb-4">
+                <div class="feature-icon mb-3">
+                    <i class="fas fa-camera fa-3x text-primary"></i>
+                </div>
+                <h5>Reconhecimento em Tempo Real</h5>
+                <p class="text-muted">Use sua câmera para praticar sinais e receba feedback instantâneo</p>
+            </div>
+            <div class="col-md-4 text-center mb-4">
+                <div class="feature-icon mb-3">
+                    <i class="fas fa-chart-line fa-3x text-success"></i>
+                </div>
+                <h5>Acompanhe seu Progresso</h5>
+                <p class="text-muted">Estatísticas detalhadas do seu desempenho e evolução</p>
+            </div>
+            <div class="col-md-4 text-center mb-4">
+                <div class="feature-icon mb-3">
+                    <i class="fas fa-trophy fa-3x text-warning"></i>
+                </div>
+                <h5>Diferentes Níveis</h5>
+                <p class="text-muted">Do iniciante ao expert, com palavras de complexidade crescente</p>
+            </div>
+        </div>
+
+        <!-- Quick Start -->
+        <div class="card shadow-sm">
+            <div class="card-body text-center p-5">
+                {% if session.username %}
+                <h3 class="mb-3">Bem-vindo de volta, {{ session.username }}!</h3>
+                <p class="mb-4">Pronto para continuar praticando?</p>
+                <div class="d-grid gap-2 d-md-block">
+                    <a href="{{ url_for('game') }}" class="btn btn-primary btn-lg me-md-2">
+                        <i class="fas fa-play"></i> Continuar Praticando
+                    </a>
+                    <a href="{{ url_for('statistics') }}" class="btn btn-outline-primary btn-lg">
+                        <i class="fas fa-chart-bar"></i> Ver Progresso
+                    </a>
+                </div>
+                {% else %}
+                <h3 class="mb-3">Comece sua Jornada</h3>
+                <p class="mb-4">Faça login para começar a aprender Libras de forma interativa</p>
+                <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg">
+                    <i class="fas fa-sign-in-alt"></i> Entrar e Começar
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- How it Works -->
+        <div class="mt-5">
+            <h3 class="text-center mb-4">Como Funciona</h3>
+            <div class="row">
+                <div class="col-md-3 text-center mb-3">
+                    <div class="step-number">1</div>
+                    <h6>Faça Login</h6>
+                    <p class="small text-muted">Crie sua conta ou entre com seu usuário</p>
+                </div>
+                <div class="col-md-3 text-center mb-3">
+                    <div class="step-number">2</div>
+                    <h6>Escolha o Nível</h6>
+                    <p class="small text-muted">Iniciante, intermediário, avançado ou expert</p>
+                </div>
+                <div class="col-md-3 text-center mb-3">
+                    <div class="step-number">3</div>
+                    <h6>Pratique Sinais</h6>
+                    <p class="small text-muted">Use a câmera para fazer os sinais das letras</p>
+                </div>
+                <div class="col-md-3 text-center mb-3">
+                    <div class="step-number">4</div>
+                    <h6>Veja seu Progresso</h6>
+                    <p class="small text-muted">Acompanhe estatísticas e melhore continuamente</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Animações simples para os elementos
+    const features = document.querySelectorAll('.feature-icon');
+    features.forEach((feature, index) => {
+        setTimeout(() => {
+            feature.style.transform = 'scale(1.1)';
+            setTimeout(() => {
+                feature.style.transform = 'scale(1)';
+            }, 300);
+        }, index * 200);
+    });
+});
+</script>
+{% endblock %}

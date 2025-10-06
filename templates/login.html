@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Libras Learning{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card shadow">
+            <div class="card-body p-5">
+                <div class="text-center mb-4">
+                    <i class="fas fa-hands fa-3x text-primary mb-3"></i>
+                    <h2>Entrar</h2>
+                    <p class="text-muted">Acesse sua conta para começar a praticar</p>
+                </div>
+                
+                <form id="loginForm">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Nome de Usuário</label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="fas fa-user"></i>
+                            </span>
+                            <input type="text" class="form-control" id="username" name="username" 
+                                   placeholder="Digite seu nome de usuário" required>
+                        </div>
+                        <div class="form-text">
+                            Se você é novo, uma conta será criada automaticamente
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg" id="loginBtn">
+                            <i class="fas fa-sign-in-alt"></i> Entrar
+                        </button>
+                    </div>
+                </form>
+                
+                <hr class="my-4">
+                
+                <div class="text-center">
+                    <p class="text-muted small">
+                        <i class="fas fa-info-circle"></i>
+                        Esta aplicação não requer senha. Apenas digite um nome de usuário para começar.
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Features Preview -->
+        <div class="mt-4">
+            <div class="row text-center">
+                <div class="col-4">
+                    <i class="fas fa-camera text-primary"></i>
+                    <small class="d-block text-muted">Câmera</small>
+                </div>
+                <div class="col-4">
+                    <i class="fas fa-brain text-success"></i>
+                    <small class="d-block text-muted">IA</small>
+                </div>
+                <div class="col-4">
+                    <i class="fas fa-chart-line text-warning"></i>
+                    <small class="d-block text-muted">Progresso</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const loginForm = document.getElementById('loginForm');
+    const loginBtn = document.getElementById('loginBtn');
+    const usernameInput = document.getElementById('username');
+    
+    loginForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const username = usernameInput.value.trim();
+        if (!username) {
+            showAlert('Por favor, digite um nome de usuário', 'warning');
+            return;
+        }
+        
+        // Disable button and show loading
+        loginBtn.disabled = true;
+        loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Entrando...';
+        
+        try {
+            const response = await fetch('/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ username: username })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showAlert(data.message, 'success');
+                setTimeout(() => {
+                    window.location.href = '/game';
+                }, 1000);
+            } else {
+                showAlert(data.message, 'danger');
+            }
+        } catch (error) {
+            console.error('Erro no login:', error);
+            showAlert('Erro de conexão. Tente novamente.', 'danger');
+        } finally {
+            // Re-enable button
+            loginBtn.disabled = false;
+            loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Entrar';
+        }
+    });
+    
+    // Focus on username input
+    usernameInput.focus();
+    
+    // Enter key support
+    usernameInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            loginForm.dispatchEvent(new Event('submit'));
+        }
+    });
+});
+</script>
+{% endblock %}

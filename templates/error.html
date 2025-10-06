@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Erro {{ error_code }} - Libras Learning{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 text-center">
+        <div class="card">
+            <div class="card-body p-5">
+                <div class="mb-4">
+                    {% if error_code == 404 %}
+                        <i class="fas fa-search fa-5x text-warning mb-3"></i>
+                        <h1 class="display-4 text-warning">404</h1>
+                        <h3>Página Não Encontrada</h3>
+                    {% elif error_code == 500 %}
+                        <i class="fas fa-exclamation-triangle fa-5x text-danger mb-3"></i>
+                        <h1 class="display-4 text-danger">500</h1>
+                        <h3>Erro Interno do Servidor</h3>
+                    {% else %}
+                        <i class="fas fa-exclamation-circle fa-5x text-muted mb-3"></i>
+                        <h1 class="display-4 text-muted">{{ error_code }}</h1>
+                        <h3>Ops! Algo deu errado</h3>
+                    {% endif %}
+                </div>
+                
+                <p class="text-muted mb-4">{{ error_message }}</p>
+                
+                <div class="d-grid gap-2 d-md-block">
+                    <a href="{{ url_for('index') }}" class="btn btn-primary">
+                        <i class="fas fa-home"></i> Voltar ao Início
+                    </a>
+                    {% if session.username %}
+                    <a href="{{ url_for('game') }}" class="btn btn-outline-primary">
+                        <i class="fas fa-gamepad"></i> Ir para o Jogo
+                    </a>
+                    {% endif %}
+                </div>
+                
+                <hr class="my-4">
+                
+                <div class="text-muted small">
+                    {% if error_code == 404 %}
+                        <p>A página que você está procurando pode ter sido movida, removida ou não existe.</p>
+                    {% elif error_code == 500 %}
+                        <p>Ocorreu um erro interno. Nossa equipe foi notificada e está trabalhando para resolver.</p>
+                    {% endif %}
+                    
+                    <p class="mb-0">
+                        <i class="fas fa-envelope"></i>
+                        Se o problema persistir, entre em contato conosco.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
