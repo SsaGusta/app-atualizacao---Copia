@@ -344,14 +344,40 @@ class CameraManager {
     }
 
     handleRecognitionResult(data) {
+        console.log('Resultado do reconhecimento:', data);
+        
         // Update confidence display
         const confidenceElement = document.getElementById('confidenceDisplay');
         if (confidenceElement) {
-            const confidence = Math.round(data.confidence * 100);
-            confidenceElement.textContent = `${confidence}%`;
+            if (data.success && data.confidence) {
+                const confidence = Math.round(data.confidence * 100);
+                confidenceElement.textContent = `${confidence}%`;
+                confidenceElement.style.color = confidence > 60 ? '#28a745' : '#ffc107';
+            } else {
+                confidenceElement.textContent = '0%';
+                confidenceElement.style.color = '#dc3545';
+            }
         }
 
-        // Update recognition result display
+        // Update recognition status display
+        const statusElement = document.getElementById('recognitionStatus');
+        if (statusElement) {
+            if (data.success) {
+                statusElement.textContent = `Reconhecido: ${data.letter}`;
+                statusElement.className = 'recognition-status success';
+            } else if (data.detected === false) {
+                statusElement.textContent = 'Nenhuma mão detectada';
+                statusElement.className = 'recognition-status no-hand';
+            } else if (data.detected === true && data.confidence < 0.3) {
+                statusElement.textContent = 'Mão detectada - forme a letra com mais precisão';
+                statusElement.className = 'recognition-status low-confidence';
+            } else {
+                statusElement.textContent = data.error || 'Erro no reconhecimento';
+                statusElement.className = 'recognition-status error';
+            }
+        }
+
+        // Update recognition result display for game modes
         const resultElement = document.getElementById('recognitionResult');
         if (resultElement && window.gameInstance && window.gameInstance.gameState && window.gameInstance.gameState.isPlaying) {
             const mode = window.gameInstance.gameState.mode;
@@ -641,6 +667,22 @@ class VideoDemonstrationManager {
     setPracticeStartCallback(callback) {
         this.onPracticeStart = callback;
     }
+
+    // Test recognition function
+    testRecognition() {
+        console.log('Testando reconhecimento...');
+        if (this.isActive && this.videoElement && this.videoElement.videoWidth > 0) {
+            // Force capture and send a frame for recognition
+            this.sendFrameForProcessing();
+        } else {
+            console.warn('Câmera não está ativa ou sem vídeo');
+            const statusElement = document.getElementById('recognitionStatus');
+            if (statusElement) {
+                statusElement.textContent = 'Câmera não está ativa';
+                statusElement.className = 'recognition-status error';
+            }
+        }
+    }
 }
 
 // Create global instance
@@ -653,6 +695,15 @@ const cameraManagerInstance = new CameraManager();
 document.addEventListener('DOMContentLoaded', () => {
     cameraManagerInstance.init();
     console.log('CameraManager initialized');
+    
+    // Initialize test button
+    const testButton = document.getElementById('testRecognitionBtn');
+    if (testButton) {
+        testButton.addEventListener('click', () => {
+            cameraManagerInstance.testRecognition();
+        });
+        console.log('Test recognition button initialized');
+    }
 });
 
 // Cleanup on page unload

@@ -54,6 +54,22 @@ except ImportError as e:
     palavras_avancado = ["MUNDO", "BRASIL", "AMIGO"]
     palavras_expert = ["INTELIGENCIA", "PROGRAMACAO"]
 
+# Importar sistema de reconhecimento LIBRAS
+try:
+    from libras_recognition import initialize_recognizer, recognize_letter
+    RECOGNITION_AVAILABLE = True
+    logger.info("Módulo de reconhecimento LIBRAS importado com sucesso")
+except ImportError as e:
+    RECOGNITION_AVAILABLE = False
+    print(f"Aviso: Sistema de reconhecimento não disponível: {e}")
+    
+    # Função fallback para reconhecimento simulado
+    def recognize_letter(image_data):
+        letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 
+                   'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
+        timestamp = int(time.time() * 10) % len(letters)
+        return letters[timestamp], random.uniform(0.6, 0.95)
+
 # ===== CONFIGURAÇÃO DA APLICAÇÃO =====
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'libras_web_app_2025_secret_key')
@@ -370,6 +386,7 @@ def process_frame():
         data = request.get_json()
         
         if not data or 'image' not in data:
+            logger.warning("Dados de imagem não fornecidos")
             return jsonify({
                 "success": False,
                 "error": "Dados de imagem não fornecidos"
@@ -378,45 +395,60 @@ def process_frame():
         # Extract base64 image data
         image_data = data['image']
         
+        # Validar dados base64
+        if not image_data or len(image_data) < 100:
+            logger.warning("Dados de imagem inválidos ou muito pequenos")
+            return jsonify({
+                "success": False,
+                "error": "Dados de imagem inválidos"
+            })
+        
         # Remove data URL prefix if present
         if image_data.startswith('data:image'):
             image_data = image_data.split(',')[1]
         
-        # Simulate letter recognition for now
-        # In a real implementation, this would use a trained ML model
-        recognized_letter = simulate_letter_recognition(image_data)
-        confidence = simulate_confidence()
+        logger.info("Processando frame para reconhecimento...")
+        
+        # Use real LIBRAS recognition system
+        recognized_letter, confidence = recognize_letter(image_data)
+        
+        # Verificar se houve sucesso no reconhecimento
+        if recognized_letter is None or confidence == 0:
+            logger.info("Nenhuma mão detectada ou baixa confiança")
+            return jsonify({
+                "success": False,
+                "error": "Nenhuma mão detectada",
+                "detected": False
+            })
+        
+        # Aplicar threshold mínimo de confiança
+        min_confidence = 0.3
+        if confidence < min_confidence:
+            logger.info(f"Confiança muito baixa: {confidence:.3f}")
+            return jsonify({
+                "success": False,
+                "error": f"Confiança muito baixa: {confidence:.1%}",
+                "detected": True,
+                "confidence": confidence
+            })
+        
+        logger.info(f"Letra reconhecida: {recognized_letter} (confiança: {confidence:.3f})")
         
         return jsonify({
             "success": True,
             "letter": recognized_letter,
             "confidence": confidence,
-            "timestamp": time.time()
+            "timestamp": time.time(),
+            "detected": True
         })
         
     except Exception as e:
         logger.error(f"Erro ao processar frame: {e}")
         return jsonify({
             "success": False,
-            "error": f"Erro interno: {e}"
+            "error": f"Erro interno: {str(e)[:100]}...",
+            "detected": False
         })
-
-def simulate_letter_recognition(image_data):
-    """Simular reconhecimento de letra LIBRAS"""
-    # Para demonstração, vamos simular o reconhecimento
-    # Em uma implementação real, aqui seria usado um modelo treinado
-    
-    letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 
-               'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
-    
-    # Simular detecção baseada em timestamp para variedade
-    timestamp = int(time.time() * 10) % len(letters)
-    return letters[timestamp]
-
-def simulate_confidence():
-    """Simular nível de confiança do reconhecimento"""
-    # Simular confiança entre 60% e 95%
-    return random.uniform(0.6, 0.95)
 
 @app.route('/api/save_game_result', methods=['POST'])
 def save_game_result():
@@ -519,6 +551,14 @@ def internal_error(error):
 
 # ===== INICIALIZAÇÃO =====
 if __name__ == '__main__':
+    # Inicializar sistema de reconhecimento LIBRAS
+    if RECOGNITION_AVAILABLE:
+        logger.info("Inicializando sistema de reconhecimento LIBRAS...")
+        if initialize_recognizer("dados_libras.csv"):
+            logger.info("Sistema de reconhecimento inicializado com sucesso")
+        else:
+            logger.warning("Falha na inicialização do reconhecimento - usando modo simulado")
+    
     # Criar diretório de templates se não existir
     os.makedirs('templates', exist_ok=True)
     os.makedirs('static/css', exist_ok=True)

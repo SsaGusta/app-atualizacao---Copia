@@ -154,6 +154,35 @@ html {
         min-height: 500px;
     }
 }
+
+/* Estilos para status de reconhecimento */
+.recognition-status {
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-top: 2px;
+    font-weight: 500;
+}
+
+.recognition-status.success {
+    background-color: rgba(40, 167, 69, 0.8);
+    color: white;
+}
+
+.recognition-status.no-hand {
+    background-color: rgba(108, 117, 125, 0.8);
+    color: white;
+}
+
+.recognition-status.low-confidence {
+    background-color: rgba(255, 193, 7, 0.8);
+    color: #212529;
+}
+
+.recognition-status.error {
+    background-color: rgba(220, 53, 69, 0.8);
+    color: white;
+}
 </style>
 {% endblock %}
 
@@ -247,7 +276,18 @@ html {
                     <div class="camera-overlay">
                         <div>FPS: <span id="fpsCounter">0</span></div>
                         <div>Confiança: <span id="confidenceDisplay">0%</span></div>
+                        <div id="recognitionStatus" class="recognition-status">Aguardando...</div>
                     </div>
+                </div>
+            </div>
+            <div class="card-footer">
+                <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle"></i> Posicione sua mão bem visível na câmera
+                    </small>
+                    <button class="btn btn-sm btn-outline-primary" id="testRecognitionBtn">
+                        <i class="fas fa-camera"></i> Testar Reconhecimento
+                    </button>
                 </div>
             </div>
         </div>
