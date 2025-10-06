@@ -2,11 +2,23 @@
 import os
 import json
 import time
+import base64
+import io
+import random
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_file, abort
 from flask_session import Session
 import threading
 import logging
+
+# Tentar importar bibliotecas de processamento de imagem
+try:
+    from PIL import Image
+    import numpy as np
+    IMAGE_PROCESSING_AVAILABLE = True
+except ImportError:
+    IMAGE_PROCESSING_AVAILABLE = False
+    print("PIL/numpy não disponível - reconhecimento simulado")
 
 # Tentar importar CORS, mas continuar se falhar
 try:
@@ -350,6 +362,61 @@ def get_video_demo(letra):
             "success": False,
             "error": f"Erro interno: {e}"
         })
+
+@app.route('/api/process_frame', methods=['POST'])
+def process_frame():
+    """Processar frame da câmera para reconhecimento LIBRAS"""
+    try:
+        data = request.get_json()
+        
+        if not data or 'image' not in data:
+            return jsonify({
+                "success": False,
+                "error": "Dados de imagem não fornecidos"
+            })
+        
+        # Extract base64 image data
+        image_data = data['image']
+        
+        # Remove data URL prefix if present
+        if image_data.startswith('data:image'):
+            image_data = image_data.split(',')[1]
+        
+        # Simulate letter recognition for now
+        # In a real implementation, this would use a trained ML model
+        recognized_letter = simulate_letter_recognition(image_data)
+        confidence = simulate_confidence()
+        
+        return jsonify({
+            "success": True,
+            "letter": recognized_letter,
+            "confidence": confidence,
+            "timestamp": time.time()
+        })
+        
+    except Exception as e:
+        logger.error(f"Erro ao processar frame: {e}")
+        return jsonify({
+            "success": False,
+            "error": f"Erro interno: {e}"
+        })
+
+def simulate_letter_recognition(image_data):
+    """Simular reconhecimento de letra LIBRAS"""
+    # Para demonstração, vamos simular o reconhecimento
+    # Em uma implementação real, aqui seria usado um modelo treinado
+    
+    letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 
+               'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
+    
+    # Simular detecção baseada em timestamp para variedade
+    timestamp = int(time.time() * 10) % len(letters)
+    return letters[timestamp]
+
+def simulate_confidence():
+    """Simular nível de confiança do reconhecimento"""
+    # Simular confiança entre 60% e 95%
+    return random.uniform(0.6, 0.95)
 
 @app.route('/api/save_game_result', methods=['POST'])
 def save_game_result():

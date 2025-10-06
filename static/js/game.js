@@ -485,6 +485,55 @@ class LibrasGame {
         console.log(`Desafio mode started: ${this.gameState.difficulty} - ${this.gameState.currentWord}`);
     }
 
+    // Method to handle letter recognition from camera
+    checkLetter(recognizedLetter) {
+        console.log('checkLetter called with:', recognizedLetter);
+        
+        if (!this.gameState.isPlaying) {
+            console.log('Game not active, ignoring recognition');
+            return;
+        }
+
+        if (this.gameState.mode === 'normal') {
+            // In normal mode, just update the display
+            const detectedLetterElement = document.getElementById('detectedLetter');
+            if (detectedLetterElement) {
+                detectedLetterElement.textContent = recognizedLetter;
+            }
+            return;
+        }
+
+        // For word modes (soletracao/desafio)
+        if (!this.gameState.currentWord || this.gameState.currentLetterIndex >= this.gameState.currentWord.length) {
+            console.log('No current word or already completed');
+            return;
+        }
+
+        const expectedLetter = this.gameState.currentWord[this.gameState.currentLetterIndex];
+        
+        if (recognizedLetter === expectedLetter) {
+            console.log(`Correct letter! ${recognizedLetter} === ${expectedLetter}`);
+            
+            // Mark letter as correct
+            this.gameState.currentLetterIndex++;
+            this.gameState.correctLetters++;
+            
+            // Update displays
+            this.updateWordDisplay();
+            this.updateProgressDisplay();
+            
+            // Check if word is complete
+            if (this.gameState.currentLetterIndex >= this.gameState.currentWord.length) {
+                this.onWordCompleted();
+            }
+            
+            showAlert(`Letra "${recognizedLetter}" correta!`, 'success');
+        } else {
+            console.log(`Incorrect letter: ${recognizedLetter} !== ${expectedLetter}`);
+            // Could add logic for handling incorrect letters
+        }
+    }
+
     stopGame() {
         this.gameState.isPlaying = false;
         
@@ -989,7 +1038,7 @@ class LibrasGame {
 // Initialize game when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Initializing LibrasGame...');
-    window.LibrasGame = new LibrasGame();
+    window.gameInstance = new LibrasGame();
     console.log('LibrasGame initialized:', window.LibrasGame);
     
     // Export for global use

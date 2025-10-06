@@ -297,7 +297,7 @@ class CameraManager {
     async sendFrameForProcessing(imageData) {
         try {
             // Only process if game is active
-            if (!window.gameState || !window.gameState.isActive) {
+            if (!window.gameInstance || !window.gameInstance.gameState || !window.gameInstance.gameState.isPlaying) {
                 return;
             }
 
@@ -347,43 +347,24 @@ class CameraManager {
         const recognizedLetter = data.letter;
         const confidence = data.confidence;
         
-        let resultHTML = '';
-        
-        if (data.has_hand) {
-            if (recognizedLetter && confidence > 0.6) {
-                resultHTML = `
-                    <div class="text-success">
-                        <i class="fas fa-hand-paper fa-2x mb-2"></i>
-                        <h4>Letra Reconhecida: "${recognizedLetter}"</h4>
-                        <p>Confiança: ${Math.round(confidence * 100)}%</p>
-                    </div>
-                `;
-            } else {
-                resultHTML = `
-                    <div class="text-info">
-                        <i class="fas fa-hand-paper fa-2x mb-2"></i>
-                        <h4>Processando sinal...</h4>
-                        ${recognizedLetter ? `<p>Detectado: "${recognizedLetter}"</p>` : ''}
-                        <small>Confiança: ${Math.round(confidence * 100)}%</small>
-                    </div>
-                `;
-            }
-        } else {
-            resultHTML = `
-                <div class="text-muted">
-                    <i class="fas fa-hand-paper fa-2x mb-2"></i>
-                    <h4>Mostre sua mão</h4>
-                    <p>Faça um sinal para reconhecimento</p>
-                </div>
-            `;
+        // Update the detected letter display
+        const detectedLetterElement = document.getElementById('detectedLetter');
+        if (detectedLetterElement && recognizedLetter && confidence > 0.6) {
+            detectedLetterElement.textContent = recognizedLetter;
         }
         
-        resultElement.innerHTML = resultHTML;
+        // For normal mode, we don't need to show detailed results anymore
+        // The letter is shown in the game interface directly
     }
     
     handleWordModeRecognition(data, resultElement) {
-        const currentWord = window.gameState.currentWord;
-        const currentLetterIndex = window.gameState.currentLetterIndex;
+        const gameInstance = window.gameInstance;
+        if (!gameInstance || !gameInstance.gameState) {
+            return;
+        }
+        
+        const currentWord = gameInstance.gameState.currentWord;
+        const currentLetterIndex = gameInstance.gameState.currentLetterIndex;
         
         if (currentWord && currentLetterIndex < currentWord.length) {
             const expectedLetter = currentWord[currentLetterIndex];
@@ -404,8 +385,9 @@ class CameraManager {
                         `;
                         
                         // Update game progress
-                        if (window.updateLetterProgress) {
-                            window.updateLetterProgress(true);
+                        if (gameInstance.checkLetter) {
+                            console.log(`Letter ${recognizedLetter} recognized correctly!`);
+                            gameInstance.checkLetter(recognizedLetter);
                         }
                     } else {
                         resultHTML = `
