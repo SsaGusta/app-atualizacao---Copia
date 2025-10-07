@@ -33,6 +33,11 @@
                             <i class="fas fa-home"></i> Início
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('mediapipe') }}">
+                            <i class="fas fa-hands"></i> MediaPipe
+                        </a>
+                    </li>
                     {% if session.username %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('game') }}">

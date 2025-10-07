@@ -161,6 +161,11 @@ def game():
                          username=session['username'],
                          recognition_enabled=RECOGNITION_ENABLED)
 
+@app.route('/mediapipe')
+def mediapipe():
+    """Página de reconhecimento de mãos com MediaPipe"""
+    return render_template('mediapipe.html')
+
 @app.route('/statistics')
 def statistics():
     """Página de estatísticas"""
