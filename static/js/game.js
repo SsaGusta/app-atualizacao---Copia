@@ -303,32 +303,8 @@ class LibrasGame {
             this.elements.challengeWord.textContent = this.gameState.currentWord;
         }
         
-        // Atualizar letra atual esperada
-        this.updateCurrentExpectedLetter();
-        
         // Criar caixas de letras
         this.createLetterBoxes();
-    }
-
-    updateCurrentExpectedLetter() {
-        const word = this.gameState.currentWord;
-        const letterIndex = this.gameState.currentLetterIndex;
-        
-        if (word && letterIndex < word.length) {
-            const currentLetter = word[letterIndex];
-            
-            // Atualizar para modo soletração
-            const expectedLetterElement = document.getElementById('currentExpectedLetter');
-            if (expectedLetterElement) {
-                expectedLetterElement.textContent = currentLetter;
-            }
-            
-            // Atualizar para modo desafio
-            const challengeExpectedLetterElement = document.getElementById('challengeExpectedLetter');
-            if (challengeExpectedLetterElement) {
-                challengeExpectedLetterElement.textContent = currentLetter;
-            }
-        }
     }
 
     createLetterBoxes() {
@@ -598,55 +574,6 @@ class LibrasGame {
         } else {
             console.log(`Incorrect letter: ${recognizedLetter} !== ${expectedLetter}`);
             // Could add logic for handling incorrect letters
-        }
-    }
-
-    // Método para avançar para próxima letra (chamado pelo reconhecimento automático)
-    nextLetter() {
-        if (!this.gameState.isPlaying || !this.gameState.currentWord) {
-            return;
-        }
-
-        if (this.gameState.currentLetterIndex < this.gameState.currentWord.length) {
-            this.gameState.currentLetterIndex++;
-            this.gameState.correctLetters++;
-            
-            // Update displays
-            this.updateWordDisplay();
-            this.updateProgressDisplay();
-            
-            // Check if word is complete
-            if (this.gameState.currentLetterIndex >= this.gameState.currentWord.length) {
-                this.onWordCompleted();
-            }
-        }
-    }
-
-    // Método para adicionar letra reconhecida (modo normal)
-    addRecognizedLetter(letter, confidence) {
-        console.log(`Letra adicionada: ${letter} (${confidence}% confiança)`);
-        
-        if (this.gameState.mode === 'normal') {
-            // Atualizar display da letra detectada
-            const detectedLetterElement = document.getElementById('detectedLetter');
-            if (detectedLetterElement) {
-                detectedLetterElement.textContent = letter;
-                detectedLetterElement.style.color = confidence > 0.8 ? '#28a745' : '#ffc107';
-            }
-            
-            // Adicionar à lista de letras reconhecidas (se existir)
-            const recognizedListElement = document.getElementById('recognizedLettersList');
-            if (recognizedListElement) {
-                const letterElement = document.createElement('span');
-                letterElement.className = `badge ${confidence > 0.8 ? 'bg-success' : 'bg-warning'} me-2 mb-2`;
-                letterElement.textContent = `${letter} (${Math.round(confidence * 100)}%)`;
-                recognizedListElement.appendChild(letterElement);
-                
-                // Limitar a 10 letras na lista
-                while (recognizedListElement.children.length > 10) {
-                    recognizedListElement.removeChild(recognizedListElement.firstChild);
-                }
-            }
         }
     }
 

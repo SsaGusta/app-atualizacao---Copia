@@ -275,23 +275,8 @@ class CameraManager {
     }
 
     startFrameProcessing() {
-        console.log('Starting frame processing...');
-        console.log('isActive:', this.isActive);
-        console.log('videoElement:', !!this.videoElement);
-        console.log('context:', !!this.context);
-        
-        // RECONHECIMENTO CONTÍNUO DURANTE O JOGO
-        this.processingInterval = setInterval(() => {
-            if (this.isActive && this.videoElement && this.context) {
-                // Verificar se o jogo está ativo
-                if (window.gameInstance && window.gameInstance.gameState && window.gameInstance.gameState.isPlaying) {
-                    console.log('Processando frame automático durante o jogo...');
-                    this.processFrame(false); // false = não é teste manual
-                }
-            }
-        }, 1000); // Processar a cada 1 segundo durante o jogo
-        
-        console.log('Frame processing: CONTÍNUO durante jogo ativo');
+        // Frame processing is now manual only
+        console.log('Frame processing started (manual mode only)');
     }
 
     async processFrame(isManualTest = false) {
@@ -372,12 +357,9 @@ class CameraManager {
                 debugInfo.textContent = `Resposta: ${data.success ? 'OK' : 'FAIL'} | ${data.method || 'N/A'}`;
             }
 
-            // Sempre atualizar UI com resultados
-            this.handleRecognitionResult(data);
-
-            // Se o jogo está ativo e reconheceu uma letra, validar
-            if (!isManualTest && data.success && window.gameInstance && window.gameInstance.gameState) {
-                this.handleGameRecognition(data);
+            // Sempre atualizar UI com resultados - APENAS TESTE MANUAL
+            if (isManualTest) {
+                this.handleRecognitionResult(data);
             }
 
         } catch (error) {
