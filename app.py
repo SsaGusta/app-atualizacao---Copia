@@ -54,27 +54,6 @@ except ImportError as e:
     palavras_avancado = ["MUNDO", "BRASIL", "AMIGO"]
     palavras_expert = ["INTELIGENCIA", "PROGRAMACAO"]
 
-# Importar sistema de reconhecimento LIBRAS
-try:
-    from libras_recognition import recognize_letter, initialize_recognizer
-    from libras_recognition_alt import recognize_letter_alternative, initialize_recognizer_alternative
-    RECOGNITION_AVAILABLE = True
-    logger.info("Módulo de reconhecimento LIBRAS importado com sucesso")
-except ImportError as e:
-    RECOGNITION_AVAILABLE = False
-    logger.error(f"ERRO CRÍTICO: Sistema de reconhecimento não disponível: {e}")
-    print(f"ERRO: Sistema de reconhecimento não disponível: {e}")
-    
-    # Funções dummy para fallback
-    def recognize_letter(image_data):
-        return None, 0
-    def initialize_recognizer():
-        return False
-    def recognize_letter_alternative(image_data):
-        return None, 0
-    def initialize_recognizer_alternative():
-        return False
-
 # ===== CONFIGURAÇÃO DA APLICAÇÃO =====
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'libras_web_app_2025_secret_key')
@@ -391,7 +370,6 @@ def process_frame():
         data = request.get_json()
         
         if not data or 'image' not in data:
-            logger.warning("Dados de imagem não fornecidos")
             return jsonify({
                 "success": False,
                 "error": "Dados de imagem não fornecidos"
@@ -400,79 +378,45 @@ def process_frame():
         # Extract base64 image data
         image_data = data['image']
         
-        # Validar dados base64
-        if not image_data or len(image_data) < 100:
-            logger.warning("Dados de imagem inválidos ou muito pequenos")
-            return jsonify({
-                "success": False,
-                "error": "Dados de imagem inválidos"
-            })
-        
         # Remove data URL prefix if present
         if image_data.startswith('data:image'):
             image_data = image_data.split(',')[1]
         
-        logger.info("Processando frame para reconhecimento...")
-        
-        # Verificar se o sistema de reconhecimento real está disponível
-        if not RECOGNITION_AVAILABLE:
-            logger.error("Sistema de reconhecimento não está disponível")
-            return jsonify({
-                "success": False,
-                "error": "Sistema de reconhecimento não inicializado",
-                "detected": False
-            })
-        
-        # Use real LIBRAS recognition system
-        try:
-            from libras_recognition import recognize_letter as real_recognize
-            recognized_letter, confidence = real_recognize(image_data)
-        except Exception as e:
-            logger.error(f"Erro no reconhecimento real: {e}")
-            return jsonify({
-                "success": False,
-                "error": f"Erro no reconhecimento: {str(e)[:50]}...",
-                "detected": False
-            })
-        
-        # Verificar se houve sucesso no reconhecimento
-        if recognized_letter is None or confidence == 0:
-            logger.info("Nenhuma mão detectada no frame")
-            return jsonify({
-                "success": False,
-                "error": "Nenhuma mão detectada",
-                "detected": False
-            })
-        
-        # Aplicar threshold mínimo de confiança
-        min_confidence = 0.4
-        if confidence < min_confidence:
-            logger.info(f"Confiança muito baixa: {confidence:.3f} < {min_confidence}")
-            return jsonify({
-                "success": False,
-                "error": f"Confiança muito baixa: {confidence:.1%}",
-                "detected": True,
-                "confidence": confidence,
-                "letter": recognized_letter
-            })
-        
-        logger.info(f"Reconhecimento bem-sucedido: {recognized_letter} (confiança: {confidence:.3f})")
+        # Simulate letter recognition for now
+        # In a real implementation, this would use a trained ML model
+        recognized_letter = simulate_letter_recognition(image_data)
+        confidence = simulate_confidence()
         
         return jsonify({
             "success": True,
             "letter": recognized_letter,
             "confidence": confidence,
-            "timestamp": time.time(),
-            "detected": True
+            "timestamp": time.time()
         })
         
     except Exception as e:
         logger.error(f"Erro ao processar frame: {e}")
         return jsonify({
             "success": False,
-            "error": f"Erro interno: {str(e)[:100]}...",
-            "detected": False
+            "error": f"Erro interno: {e}"
         })
+
+def simulate_letter_recognition(image_data):
+    """Simular reconhecimento de letra LIBRAS"""
+    # Para demonstração, vamos simular o reconhecimento
+    # Em uma implementação real, aqui seria usado um modelo treinado
+    
+    letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 
+               'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
+    
+    # Simular detecção baseada em timestamp para variedade
+    timestamp = int(time.time() * 10) % len(letters)
+    return letters[timestamp]
+
+def simulate_confidence():
+    """Simular nível de confiança do reconhecimento"""
+    # Simular confiança entre 60% e 95%
+    return random.uniform(0.6, 0.95)
 
 @app.route('/api/save_game_result', methods=['POST'])
 def save_game_result():
@@ -575,36 +519,6 @@ def internal_error(error):
 
 # ===== INICIALIZAÇÃO =====
 if __name__ == '__main__':
-    # Inicializar sistema de reconhecimento LIBRAS
-    if RECOGNITION_AVAILABLE:
-        logger.info("Inicializando sistema de reconhecimento LIBRAS...")
-        
-        # Tentar MediaPipe primeiro
-        mediapipe_available = False
-        if initialize_recognizer("dados_libras.csv"):
-            logger.info("✓ Sistema MediaPipe inicializado com sucesso")
-            mediapipe_available = True
-        else:
-            logger.warning("✗ MediaPipe não disponível")
-        
-        # Inicializar alternativo
-        alt_available = False
-        if initialize_recognizer_alternative("dados_libras.csv"):
-            logger.info("✓ Sistema alternativo (OpenCV) inicializado com sucesso")
-            alt_available = True
-        else:
-            logger.warning("✗ Erro ao inicializar sistema alternativo")
-        
-        if not mediapipe_available and not alt_available:
-            logger.error("✗ ERRO: Nenhum sistema de reconhecimento disponível!")
-        else:
-            if mediapipe_available:
-                logger.info("→ Usando MediaPipe como principal")
-            else:
-                logger.info("→ Usando OpenCV como principal")
-    else:
-        logger.warning("Sistema de reconhecimento não disponível - usando modo simulado")
-    
     # Criar diretório de templates se não existir
     os.makedirs('templates', exist_ok=True)
     os.makedirs('static/css', exist_ok=True)
