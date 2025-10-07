@@ -303,34 +303,80 @@ class LibrasGame {
             this.elements.challengeWord.textContent = this.gameState.currentWord;
         }
         
+        // Atualizar letra atual esperada
+        this.updateCurrentExpectedLetter();
+        
         // Criar caixas de letras
         this.createLetterBoxes();
+    }
+
+    updateCurrentExpectedLetter() {
+        const word = this.gameState.currentWord;
+        const letterIndex = this.gameState.currentLetterIndex;
+        
+        if (word && letterIndex < word.length) {
+            const currentLetter = word[letterIndex];
+            
+            // Atualizar para modo soletração
+            const expectedLetterElement = document.getElementById('currentExpectedLetter');
+            if (expectedLetterElement) {
+                expectedLetterElement.textContent = currentLetter;
+            }
+            
+            // Atualizar para modo desafio
+            const challengeExpectedLetterElement = document.getElementById('challengeExpectedLetter');
+            if (challengeExpectedLetterElement) {
+                challengeExpectedLetterElement.textContent = currentLetter;
+            }
+        }
     }
 
     createLetterBoxes() {
         const word = this.gameState.currentWord;
         if (!word) return;
 
-        // Para modo normal
+        const currentIndex = this.gameState.currentLetterIndex;
+
+        // Para modo soletração
         if (this.elements.letterBoxes) {
             this.elements.letterBoxes.innerHTML = '';
             for (let i = 0; i < word.length; i++) {
                 const box = document.createElement('div');
-                box.className = 'letter-box';
+                let boxClass = 'letter-box';
+                let borderColor = '#ddd';
+                let backgroundColor = 'white';
+                let textContent = '_';
+                
+                if (i < currentIndex) {
+                    // Letra já completada
+                    boxClass += ' completed';
+                    borderColor = '#28a745';
+                    backgroundColor = '#d4edda';
+                    textContent = word[i];
+                } else if (i === currentIndex) {
+                    // Letra atual
+                    boxClass += ' current';
+                    borderColor = '#007bff';
+                    backgroundColor = '#e3f2fd';
+                    textContent = word[i];
+                }
+                
+                box.className = boxClass;
                 box.style.cssText = `
                     display: inline-block;
                     width: 50px;
                     height: 50px;
-                    border: 2px solid #ddd;
+                    border: 2px solid ${borderColor};
                     margin: 0 5px;
                     text-align: center;
                     line-height: 46px;
                     font-size: 24px;
                     font-weight: bold;
                     border-radius: 5px;
-                    background: white;
+                    background: ${backgroundColor};
+                    transition: all 0.3s ease;
                 `;
-                box.textContent = '_';
+                box.textContent = textContent;
                 box.id = `letter-${i}`;
                 this.elements.letterBoxes.appendChild(box);
             }
@@ -341,21 +387,41 @@ class LibrasGame {
             this.elements.challengeLetterBoxes.innerHTML = '';
             for (let i = 0; i < word.length; i++) {
                 const box = document.createElement('div');
-                box.className = 'letter-box';
+                let boxClass = 'letter-box';
+                let borderColor = '#ddd';
+                let backgroundColor = 'white';
+                let textContent = '_';
+                
+                if (i < currentIndex) {
+                    // Letra já completada
+                    boxClass += ' completed';
+                    borderColor = '#28a745';
+                    backgroundColor = '#d4edda';
+                    textContent = word[i];
+                } else if (i === currentIndex) {
+                    // Letra atual
+                    boxClass += ' current';
+                    borderColor = '#ffc107';
+                    backgroundColor = '#fff3cd';
+                    textContent = word[i];
+                }
+                
+                box.className = boxClass;
                 box.style.cssText = `
                     display: inline-block;
                     width: 50px;
                     height: 50px;
-                    border: 2px solid #ddd;
+                    border: 2px solid ${borderColor};
                     margin: 0 5px;
                     text-align: center;
                     line-height: 46px;
                     font-size: 24px;
                     font-weight: bold;
                     border-radius: 5px;
-                    background: white;
+                    background: ${backgroundColor};
+                    transition: all 0.3s ease;
                 `;
-                box.textContent = '_';
+                box.textContent = textContent;
                 box.id = `challenge-letter-${i}`;
                 this.elements.challengeLetterBoxes.appendChild(box);
             }
@@ -532,6 +598,55 @@ class LibrasGame {
         } else {
             console.log(`Incorrect letter: ${recognizedLetter} !== ${expectedLetter}`);
             // Could add logic for handling incorrect letters
+        }
+    }
+
+    // Método para avançar para próxima letra (chamado pelo reconhecimento automático)
+    nextLetter() {
+        if (!this.gameState.isPlaying || !this.gameState.currentWord) {
+            return;
+        }
+
+        if (this.gameState.currentLetterIndex < this.gameState.currentWord.length) {
+            this.gameState.currentLetterIndex++;
+            this.gameState.correctLetters++;
+            
+            // Update displays
+            this.updateWordDisplay();
+            this.updateProgressDisplay();
+            
+            // Check if word is complete
+            if (this.gameState.currentLetterIndex >= this.gameState.currentWord.length) {
+                this.onWordCompleted();
+            }
+        }
+    }
+
+    // Método para adicionar letra reconhecida (modo normal)
+    addRecognizedLetter(letter, confidence) {
+        console.log(`Letra adicionada: ${letter} (${confidence}% confiança)`);
+        
+        if (this.gameState.mode === 'normal') {
+            // Atualizar display da letra detectada
+            const detectedLetterElement = document.getElementById('detectedLetter');
+            if (detectedLetterElement) {
+                detectedLetterElement.textContent = letter;
+                detectedLetterElement.style.color = confidence > 0.8 ? '#28a745' : '#ffc107';
+            }
+            
+            // Adicionar à lista de letras reconhecidas (se existir)
+            const recognizedListElement = document.getElementById('recognizedLettersList');
+            if (recognizedListElement) {
+                const letterElement = document.createElement('span');
+                letterElement.className = `badge ${confidence > 0.8 ? 'bg-success' : 'bg-warning'} me-2 mb-2`;
+                letterElement.textContent = `${letter} (${Math.round(confidence * 100)}%)`;
+                recognizedListElement.appendChild(letterElement);
+                
+                // Limitar a 10 letras na lista
+                while (recognizedListElement.children.length > 10) {
+                    recognizedListElement.removeChild(recognizedListElement.firstChild);
+                }
+            }
         }
     }
 

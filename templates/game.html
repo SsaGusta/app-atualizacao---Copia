@@ -278,21 +278,37 @@ html {
                 <div class="camera-container">
                     <video id="videoElement" autoplay muted playsinline></video>
                     <canvas id="canvasElement" style="display: none;"></canvas>
+                    <!-- Canvas de debug visível -->
+                    <canvas id="debugCanvas" style="position: absolute; top: 10px; right: 10px; width: 120px; height: 90px; border: 2px solid #007bff; background: rgba(255,255,255,0.9); z-index: 10;"></canvas>
                     <div class="camera-overlay">
                         <div>FPS: <span id="fpsCounter">0</span></div>
                         <div>Confiança: <span id="confidenceDisplay">0%</span></div>
                         <div id="recognitionStatus" class="recognition-status">Aguardando...</div>
+                        <div style="font-size: 10px; margin-top: 4px;">
+                            <span id="debugInfo">Debug: -</span>
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="card-footer">
                 <div class="d-flex justify-content-between align-items-center">
                     <small class="text-muted">
-                        <i class="fas fa-info-circle"></i> Posicione sua mão bem visível na câmera
+                        <i class="fas fa-info-circle"></i> 
+                        <strong>Como testar:</strong> 
+                        1) Posicione sua mão fazendo uma letra LIBRAS 
+                        2) Clique "Testar Reconhecimento"
+                        3) Veja o resultado na área de status
                     </small>
                     <button class="btn btn-sm btn-outline-primary" id="testRecognitionBtn">
                         <i class="fas fa-camera"></i> Testar Reconhecimento
                     </button>
+                </div>
+                <div class="mt-2">
+                    <small class="text-info">
+                        <i class="fas fa-lightbulb"></i> 
+                        <strong>Dica:</strong> O teste funciona independente do jogo estar ativo. 
+                        Use para verificar se sua mão está sendo detectada corretamente.
+                    </small>
                 </div>
             </div>
         </div>
@@ -341,6 +357,14 @@ html {
                         <div class="display-1 text-primary font-weight-bold" id="detectedLetter">-</div>
                     </div>
                     <div class="mt-3">
+                        <h6 class="text-muted">Histórico de Reconhecimento:</h6>
+                        <div class="bg-light p-2 rounded" style="min-height: 60px; max-height: 120px; overflow-y: auto;">
+                            <div id="recognizedLettersList">
+                                <small class="text-muted">Nenhuma letra reconhecida ainda...</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3">
                         <button class="btn btn-info btn-sm" onclick="window.showVideoDemo('A')">
                             <i class="fas fa-play-circle"></i> Ver Demonstração
                         </button>
@@ -356,10 +380,14 @@ html {
                     <div class="letter-boxes" id="letterBoxes">
                         <!-- Letter boxes will be generated here -->
                     </div>
-                    <div class="mt-3">
-                        <small class="text-muted">
-                            Letra: <span id="letterPosition">0</span> / <span id="totalLetters">0</span>
-                        </small>
+                    <div class="mt-3 text-center">
+                        <div class="alert alert-primary">
+                            <h5 class="mb-1">Faça o sinal da letra:</h5>
+                            <div class="display-3 font-weight-bold" id="currentExpectedLetter">-</div>
+                            <small class="text-muted">
+                                Posição: <span id="letterPosition">0</span> / <span id="totalLetters">0</span>
+                            </small>
+                        </div>
                     </div>
                     <div class="mt-3">
                         <button class="btn btn-info btn-sm" id="showDemoBtn" onclick="showCurrentLetterDemo()">
@@ -373,6 +401,16 @@ html {
                     <div class="current-word" id="challengeWord">---</div>
                     <div class="letter-boxes" id="challengeLetterBoxes">
                         <!-- Letter boxes will be generated here -->
+                    </div>
+                    <div class="mt-3 text-center">
+                        <div class="alert alert-warning">
+                            <h5 class="mb-1">Faça o sinal da letra:</h5>
+                            <div class="display-3 font-weight-bold" id="challengeExpectedLetter">-</div>
+                            <small class="text-muted">
+                                Posição: <span id="challengeLetterPosition">0</span> / <span id="challengeTotalLetters">0</span><br>
+                                Palavra: <span id="challengeWordCount">0</span> / <span id="totalChallengeWords">0</span>
+                            </small>
+                        </div>
                     </div>
                     <div class="mt-3">
                         <div class="row text-center">

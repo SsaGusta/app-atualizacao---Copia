@@ -4,7 +4,9 @@ class CameraManager {
         this.stream = null;
         this.videoElement = null;
         this.canvasElement = null;
+        this.debugCanvas = null;
         this.context = null;
+        this.debugContext = null;
         this.isActive = false;
         this.lastFrameTime = 0;
         this.frameCount = 0;
@@ -17,12 +19,19 @@ class CameraManager {
     init() {
         this.videoElement = document.getElementById('videoElement');
         this.canvasElement = document.getElementById('canvasElement');
+        this.debugCanvas = document.getElementById('debugCanvas');
         
         if (this.canvasElement) {
             this.context = this.canvasElement.getContext('2d');
             // Set canvas size to match video
             this.canvasElement.width = 640;
             this.canvasElement.height = 480;
+        }
+        
+        if (this.debugCanvas) {
+            this.debugContext = this.debugCanvas.getContext('2d');
+            this.debugCanvas.width = 120;
+            this.debugCanvas.height = 90;
         }
         
         this.setupFPSCounter();
@@ -271,17 +280,21 @@ class CameraManager {
         console.log('videoElement:', !!this.videoElement);
         console.log('context:', !!this.context);
         
-        // MODO MANUAL - só processar quando clicar no botão
-        // this.processingInterval = setInterval(() => {
-        //     if (this.isActive && this.videoElement && this.context) {
-        //         this.processFrame();
-        //     }
-        // }, 100); // 10 FPS
+        // RECONHECIMENTO CONTÍNUO DURANTE O JOGO
+        this.processingInterval = setInterval(() => {
+            if (this.isActive && this.videoElement && this.context) {
+                // Verificar se o jogo está ativo
+                if (window.gameInstance && window.gameInstance.gameState && window.gameInstance.gameState.isPlaying) {
+                    console.log('Processando frame automático durante o jogo...');
+                    this.processFrame(false); // false = não é teste manual
+                }
+            }
+        }, 1000); // Processar a cada 1 segundo durante o jogo
         
-        console.log('Frame processing: MANUAL MODE - use o botão Testar');
+        console.log('Frame processing: CONTÍNUO durante jogo ativo');
     }
 
-    async processFrame() {
+    async processFrame(isManualTest = false) {
         try {
             // Draw current frame to canvas
             this.context.drawImage(
@@ -291,35 +304,55 @@ class CameraManager {
                 this.canvasElement.height
             );
 
+            // Draw frame to debug canvas (small version)
+            if (this.debugContext) {
+                this.debugContext.drawImage(
+                    this.videoElement,
+                    0, 0,
+                    this.debugCanvas.width,
+                    this.debugCanvas.height
+                );
+                
+                // Add frame info
+                const debugInfo = document.getElementById('debugInfo');
+                if (debugInfo) {
+                    debugInfo.textContent = `Debug: ${this.canvasElement.width}x${this.canvasElement.height} | Test: ${isManualTest}`;
+                }
+            }
+
             // Convert canvas to base64
             const imageData = this.canvasElement.toDataURL('image/jpeg', 0.7);
 
             // Send to backend for processing
-            await this.sendFrameForProcessing(imageData);
+            await this.sendFrameForProcessing(imageData, isManualTest);
 
             this.frameCount++;
 
         } catch (error) {
             console.error('Erro ao processar frame:', error);
+            this.updateRecognitionStatus('Erro ao processar imagem', 'error');
         }
     }
 
-    async sendFrameForProcessing(imageData) {
+    async sendFrameForProcessing(imageData, isManualTest = false) {
         try {
-            // Only process if game is active
-            if (!window.gameInstance || !window.gameInstance.gameState || !window.gameInstance.gameState.isPlaying) {
-                console.log('Game not active, skipping frame processing');
-                console.log('gameInstance:', !!window.gameInstance);
-                if (window.gameInstance) {
-                    console.log('gameState:', !!window.gameInstance.gameState);
-                    if (window.gameInstance.gameState) {
-                        console.log('isPlaying:', window.gameInstance.gameState.isPlaying);
-                    }
+            // Se não é teste manual, verificar se o jogo está ativo
+            if (!isManualTest) {
+                if (!window.gameInstance || !window.gameInstance.gameState || !window.gameInstance.gameState.isPlaying) {
+                    console.log('Game not active, skipping automatic processing');
+                    return;
                 }
-                return;
             }
 
             console.log('Sending frame for processing...');
+            console.log('Image data length:', imageData.length);
+            console.log('Is manual test:', isManualTest);
+
+            // Update debug info
+            const debugInfo = document.getElementById('debugInfo');
+            if (debugInfo) {
+                debugInfo.textContent = `Enviando... ${Math.round(imageData.length/1024)}KB`;
+            }
 
             const response = await fetch('/api/process_frame', {
                 method: 'POST',
@@ -334,12 +367,27 @@ class CameraManager {
             const data = await response.json();
             console.log('Recognition response:', data);
 
-            if (data.success) {
-                this.handleRecognitionResult(data);
+            // Update debug info with response
+            if (debugInfo) {
+                debugInfo.textContent = `Resposta: ${data.success ? 'OK' : 'FAIL'} | ${data.method || 'N/A'}`;
+            }
+
+            // Sempre atualizar UI com resultados
+            this.handleRecognitionResult(data);
+
+            // Se o jogo está ativo e reconheceu uma letra, validar
+            if (!isManualTest && data.success && window.gameInstance && window.gameInstance.gameState) {
+                this.handleGameRecognition(data);
             }
 
         } catch (error) {
             console.error('Erro ao enviar frame:', error);
+            this.updateRecognitionStatus('Erro de conexão', 'error');
+            
+            const debugInfo = document.getElementById('debugInfo');
+            if (debugInfo) {
+                debugInfo.textContent = `Erro: ${error.message}`;
+            }
         }
     }
 
@@ -359,22 +407,18 @@ class CameraManager {
             }
         }
 
-        // Update recognition status display
-        const statusElement = document.getElementById('recognitionStatus');
-        if (statusElement) {
-            if (data.success) {
-                statusElement.textContent = `Reconhecido: ${data.letter}`;
-                statusElement.className = 'recognition-status success';
-            } else if (data.detected === false) {
-                statusElement.textContent = 'Nenhuma mão detectada';
-                statusElement.className = 'recognition-status no-hand';
-            } else if (data.detected === true && data.confidence < 0.3) {
-                statusElement.textContent = 'Mão detectada - forme a letra com mais precisão';
-                statusElement.className = 'recognition-status low-confidence';
-            } else {
-                statusElement.textContent = data.error || 'Erro no reconhecimento';
-                statusElement.className = 'recognition-status error';
-            }
+        // Update recognition status display with more information
+        if (data.success) {
+            const method = data.method ? ` (${data.method})` : '';
+            this.updateRecognitionStatus(`Reconhecido: ${data.letter}${method}`, 'success');
+        } else if (data.error && data.error.includes('Nenhuma mão detectada')) {
+            this.updateRecognitionStatus('Nenhuma mão detectada', 'no-hand');
+        } else if (data.error && data.error.includes('Confiança baixa')) {
+            const method = data.method ? ` (${data.method})` : '';
+            this.updateRecognitionStatus(`${data.error}${method}`, 'low-confidence');
+        } else {
+            const method = data.method ? ` (${data.method})` : '';
+            this.updateRecognitionStatus((data.error || 'Erro no reconhecimento') + method, 'error');
         }
 
         // Update recognition result display for game modes
@@ -387,6 +431,76 @@ class CameraManager {
             } else if (mode === 'soletracao' || mode === 'desafio') {
                 this.handleWordModeRecognition(data, resultElement);
             }
+        }
+    }
+
+    handleGameRecognition(data) {
+        console.log('Processando reconhecimento para o jogo:', data);
+        
+        const gameState = window.gameInstance.gameState;
+        const recognizedLetter = data.letter;
+        const confidence = data.confidence;
+        
+        if (!recognizedLetter || confidence < 0.7) { // Exigir 70% de confiança para o jogo
+            console.log('Confiança insuficiente para validação automática:', confidence);
+            return;
+        }
+        
+        // Verificar qual modo de jogo está ativo
+        if (gameState.mode === 'normal') {
+            this.handleNormalGameRecognition(recognizedLetter, confidence);
+        } else if (gameState.mode === 'soletracao' || gameState.mode === 'desafio') {
+            this.handleWordGameRecognition(recognizedLetter, confidence);
+        }
+    }
+    
+    handleNormalGameRecognition(recognizedLetter, confidence) {
+        console.log(`Modo Normal: Letra reconhecida ${recognizedLetter} com ${confidence}% confiança`);
+        
+        // No modo normal, apenas mostrar a letra detectada
+        const detectedLetterElement = document.getElementById('detectedLetter');
+        if (detectedLetterElement) {
+            detectedLetterElement.textContent = recognizedLetter;
+            detectedLetterElement.style.color = confidence > 0.8 ? '#28a745' : '#ffc107';
+        }
+        
+        // Adicionar à lista de letras reconhecidas se não existir
+        if (window.gameInstance && window.gameInstance.addRecognizedLetter) {
+            window.gameInstance.addRecognizedLetter(recognizedLetter, confidence);
+        }
+    }
+    
+    handleWordGameRecognition(recognizedLetter, confidence) {
+        const gameState = window.gameInstance.gameState;
+        const currentWord = gameState.currentWord;
+        const currentLetterIndex = gameState.currentLetterIndex || 0;
+        
+        if (!currentWord || currentLetterIndex >= currentWord.length) {
+            console.log('Palavra não definida ou já completada');
+            return;
+        }
+        
+        const expectedLetter = currentWord[currentLetterIndex];
+        
+        console.log(`Modo ${gameState.mode}: Esperando ${expectedLetter}, reconhecido ${recognizedLetter}`);
+        
+        if (recognizedLetter === expectedLetter) {
+            console.log('✓ Letra correta! Avançando...');
+            
+            // Atualizar interface com sucesso
+            this.updateRecognitionStatus(`✓ Correto: ${recognizedLetter}!`, 'success');
+            
+            // Usar o método checkLetter existente do jogo
+            if (window.gameInstance && window.gameInstance.checkLetter) {
+                setTimeout(() => {
+                    window.gameInstance.checkLetter(recognizedLetter);
+                }, 1000); // Aguardar 1s antes de processar
+            }
+        } else {
+            console.log(`✗ Letra incorreta. Esperado: ${expectedLetter}, Reconhecido: ${recognizedLetter}`);
+            
+            // Mostrar feedback sem avançar
+            this.updateRecognitionStatus(`Esperado: ${expectedLetter}, Detectado: ${recognizedLetter}`, 'low-confidence');
         }
     }
     
@@ -499,28 +613,59 @@ class CameraManager {
         
         if (!this.isActive) {
             console.warn('Câmera não está ativa');
-            this.updateRecognitionStatus('Câmera não está ativa', 'error');
+            this.updateRecognitionStatus('❌ Câmera não está ativa', 'error');
             return;
         }
         
         if (!this.videoElement || this.videoElement.videoWidth === 0) {
             console.warn('Vídeo não está pronto');
-            this.updateRecognitionStatus('Vídeo não está pronto', 'error');
+            this.updateRecognitionStatus('❌ Vídeo não está pronto', 'error');
             return;
         }
         
         console.log('Processando frame manual...');
-        this.updateRecognitionStatus('Processando...', 'processing');
+        console.log('Video dimensions:', this.videoElement.videoWidth, 'x', this.videoElement.videoHeight);
         
-        // Processar frame atual
-        this.processFrame();
+        this.updateRecognitionStatus('🔄 Processando...', 'processing');
+        
+        // Update debug info
+        const debugInfo = document.getElementById('debugInfo');
+        if (debugInfo) {
+            debugInfo.textContent = `Iniciando teste manual...`;
+        }
+        
+        // Processar frame atual como teste manual
+        this.processFrame(true);  // true = isManualTest
     }
 
     updateRecognitionStatus(message, type) {
         const statusElement = document.getElementById('recognitionStatus');
         if (statusElement) {
             statusElement.textContent = message;
-            statusElement.className = `recognition-status ${type}`;
+            
+            // Remover classes anteriores
+            statusElement.className = 'recognition-status';
+            
+            // Adicionar classe baseada no tipo
+            switch(type) {
+                case 'success':
+                    statusElement.classList.add('success');
+                    break;
+                case 'error':
+                    statusElement.classList.add('error');
+                    break;
+                case 'processing':
+                    statusElement.classList.add('processing');
+                    break;
+                case 'no-hand':
+                    statusElement.classList.add('no-hand');
+                    break;
+                case 'low-confidence':
+                    statusElement.classList.add('low-confidence');
+                    break;
+                default:
+                    statusElement.classList.add('default');
+            }
         }
     }
 }
