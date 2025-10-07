@@ -56,13 +56,24 @@ except ImportError as e:
 
 # Importar sistema de reconhecimento LIBRAS
 try:
-    from libras_recognition import initialize_recognizer, recognize_letter
+    from libras_recognition import recognize_letter, initialize_recognizer
+    from libras_recognition_alt import recognize_letter_alternative, initialize_recognizer_alternative
     RECOGNITION_AVAILABLE = True
     logger.info("Módulo de reconhecimento LIBRAS importado com sucesso")
 except ImportError as e:
     RECOGNITION_AVAILABLE = False
     logger.error(f"ERRO CRÍTICO: Sistema de reconhecimento não disponível: {e}")
     print(f"ERRO: Sistema de reconhecimento não disponível: {e}")
+    
+    # Funções dummy para fallback
+    def recognize_letter(image_data):
+        return None, 0
+    def initialize_recognizer():
+        return False
+    def recognize_letter_alternative(image_data):
+        return None, 0
+    def initialize_recognizer_alternative():
+        return False
 
 # ===== CONFIGURAÇÃO DA APLICAÇÃO =====
 app = Flask(__name__)
@@ -567,10 +578,32 @@ if __name__ == '__main__':
     # Inicializar sistema de reconhecimento LIBRAS
     if RECOGNITION_AVAILABLE:
         logger.info("Inicializando sistema de reconhecimento LIBRAS...")
+        
+        # Tentar MediaPipe primeiro
+        mediapipe_available = False
         if initialize_recognizer("dados_libras.csv"):
-            logger.info("Sistema de reconhecimento inicializado com sucesso")
+            logger.info("✓ Sistema MediaPipe inicializado com sucesso")
+            mediapipe_available = True
         else:
-            logger.warning("Falha na inicialização do reconhecimento - usando modo simulado")
+            logger.warning("✗ MediaPipe não disponível")
+        
+        # Inicializar alternativo
+        alt_available = False
+        if initialize_recognizer_alternative("dados_libras.csv"):
+            logger.info("✓ Sistema alternativo (OpenCV) inicializado com sucesso")
+            alt_available = True
+        else:
+            logger.warning("✗ Erro ao inicializar sistema alternativo")
+        
+        if not mediapipe_available and not alt_available:
+            logger.error("✗ ERRO: Nenhum sistema de reconhecimento disponível!")
+        else:
+            if mediapipe_available:
+                logger.info("→ Usando MediaPipe como principal")
+            else:
+                logger.info("→ Usando OpenCV como principal")
+    else:
+        logger.warning("Sistema de reconhecimento não disponível - usando modo simulado")
     
     # Criar diretório de templates se não existir
     os.makedirs('templates', exist_ok=True)
