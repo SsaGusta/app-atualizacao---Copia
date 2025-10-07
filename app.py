@@ -61,14 +61,8 @@ try:
     logger.info("Módulo de reconhecimento LIBRAS importado com sucesso")
 except ImportError as e:
     RECOGNITION_AVAILABLE = False
-    print(f"Aviso: Sistema de reconhecimento não disponível: {e}")
-    
-    # Função fallback para reconhecimento simulado
-    def recognize_letter(image_data):
-        letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 
-                   'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
-        timestamp = int(time.time() * 10) % len(letters)
-        return letters[timestamp], random.uniform(0.6, 0.95)
+    logger.error(f"ERRO CRÍTICO: Sistema de reconhecimento não disponível: {e}")
+    print(f"ERRO: Sistema de reconhecimento não disponível: {e}")
 
 # ===== CONFIGURAÇÃO DA APLICAÇÃO =====
 app = Flask(__name__)
@@ -409,12 +403,30 @@ def process_frame():
         
         logger.info("Processando frame para reconhecimento...")
         
+        # Verificar se o sistema de reconhecimento real está disponível
+        if not RECOGNITION_AVAILABLE:
+            logger.error("Sistema de reconhecimento não está disponível")
+            return jsonify({
+                "success": False,
+                "error": "Sistema de reconhecimento não inicializado",
+                "detected": False
+            })
+        
         # Use real LIBRAS recognition system
-        recognized_letter, confidence = recognize_letter(image_data)
+        try:
+            from libras_recognition import recognize_letter as real_recognize
+            recognized_letter, confidence = real_recognize(image_data)
+        except Exception as e:
+            logger.error(f"Erro no reconhecimento real: {e}")
+            return jsonify({
+                "success": False,
+                "error": f"Erro no reconhecimento: {str(e)[:50]}...",
+                "detected": False
+            })
         
         # Verificar se houve sucesso no reconhecimento
         if recognized_letter is None or confidence == 0:
-            logger.info("Nenhuma mão detectada ou baixa confiança")
+            logger.info("Nenhuma mão detectada no frame")
             return jsonify({
                 "success": False,
                 "error": "Nenhuma mão detectada",
@@ -422,17 +434,18 @@ def process_frame():
             })
         
         # Aplicar threshold mínimo de confiança
-        min_confidence = 0.3
+        min_confidence = 0.4
         if confidence < min_confidence:
-            logger.info(f"Confiança muito baixa: {confidence:.3f}")
+            logger.info(f"Confiança muito baixa: {confidence:.3f} < {min_confidence}")
             return jsonify({
                 "success": False,
                 "error": f"Confiança muito baixa: {confidence:.1%}",
                 "detected": True,
-                "confidence": confidence
+                "confidence": confidence,
+                "letter": recognized_letter
             })
         
-        logger.info(f"Letra reconhecida: {recognized_letter} (confiança: {confidence:.3f})")
+        logger.info(f"Reconhecimento bem-sucedido: {recognized_letter} (confiança: {confidence:.3f})")
         
         return jsonify({
             "success": True,

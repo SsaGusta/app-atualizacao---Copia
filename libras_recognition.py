@@ -255,10 +255,13 @@ class LibrasRecognizer:
                 logger.error("Modelo não carregado")
                 return None, 0
             
+            logger.info("Iniciando extração de landmarks...")
+            
             # Extrair landmarks
             landmarks = self.extract_hand_landmarks(image_data)
             
             if landmarks is None:
+                logger.info("Falha na extração de landmarks - nenhuma mão detectada")
                 return None, 0
             
             # Verificar se temos o número correto de features
@@ -267,32 +270,44 @@ class LibrasRecognizer:
                 logger.error(f"Número incorreto de features: {len(landmarks)} != {expected_features}")
                 return None, 0
             
+            logger.info(f"Landmarks extraídos com sucesso: {expected_features} features")
+            
             # Preprocessar
             landmarks_scaled = self.scaler.transform([landmarks])
+            logger.info("Dados preprocessados")
             
             # Prever
             prediction = self.model.predict(landmarks_scaled)[0]
+            logger.info(f"Predição numérica: {prediction}")
             
             # Calcular confiança usando probabilidades dos vizinhos
             try:
                 probabilities = self.model.predict_proba(landmarks_scaled)[0]
                 confidence = float(np.max(probabilities))
+                logger.info(f"Confiança calculada via probabilidades: {confidence:.3f}")
             except:
                 # Fallback: usar distância dos vizinhos
                 distances, indices = self.model.kneighbors(landmarks_scaled)
                 # Converter distância em confiança (distância menor = confiança maior)
                 avg_distance = np.mean(distances[0])
                 confidence = max(0.1, 1.0 - min(avg_distance, 1.0))
+                logger.info(f"Confiança calculada via distância: {confidence:.3f}")
             
             # Decodificar label
             letter = self.reverse_label_encoder.get(prediction, None)
             
-            logger.info(f"Predição: {letter} (confiança: {confidence:.3f})")
+            if letter is None:
+                logger.error(f"Não foi possível decodificar predição: {prediction}")
+                return None, 0
+            
+            logger.info(f"Predição final: {letter} (confiança: {confidence:.3f})")
             
             return letter, float(confidence)
             
         except Exception as e:
-            logger.error(f"Erro na predição: {e}")
+            logger.error(f"Erro crítico na predição: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return None, 0
 
 # Instância global do reconhecedor

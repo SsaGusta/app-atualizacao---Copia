@@ -271,14 +271,14 @@ class CameraManager {
         console.log('videoElement:', !!this.videoElement);
         console.log('context:', !!this.context);
         
-        // Process frames at 10 FPS to reduce load
-        this.processingInterval = setInterval(() => {
-            if (this.isActive && this.videoElement && this.context) {
-                this.processFrame();
-            }
-        }, 100); // 10 FPS
+        // MODO MANUAL - só processar quando clicar no botão
+        // this.processingInterval = setInterval(() => {
+        //     if (this.isActive && this.videoElement && this.context) {
+        //         this.processFrame();
+        //     }
+        // }, 100); // 10 FPS
         
-        console.log('Frame processing interval started');
+        console.log('Frame processing: MANUAL MODE - use o botão Testar');
     }
 
     async processFrame() {
@@ -490,6 +490,37 @@ class CameraManager {
         this.stop();
         if (this.fpsInterval) {
             clearInterval(this.fpsInterval);
+        }
+    }
+
+    // Test recognition manually
+    testRecognition() {
+        console.log('=== TESTE DE RECONHECIMENTO MANUAL ===');
+        
+        if (!this.isActive) {
+            console.warn('Câmera não está ativa');
+            this.updateRecognitionStatus('Câmera não está ativa', 'error');
+            return;
+        }
+        
+        if (!this.videoElement || this.videoElement.videoWidth === 0) {
+            console.warn('Vídeo não está pronto');
+            this.updateRecognitionStatus('Vídeo não está pronto', 'error');
+            return;
+        }
+        
+        console.log('Processando frame manual...');
+        this.updateRecognitionStatus('Processando...', 'processing');
+        
+        // Processar frame atual
+        this.processFrame();
+    }
+
+    updateRecognitionStatus(message, type) {
+        const statusElement = document.getElementById('recognitionStatus');
+        if (statusElement) {
+            statusElement.textContent = message;
+            statusElement.className = `recognition-status ${type}`;
         }
     }
 }
