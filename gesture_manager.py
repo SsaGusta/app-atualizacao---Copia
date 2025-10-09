@@ -245,6 +245,126 @@ class GestureManager:
         
         return result
 
+    def recognize_gesture(self, landmarks: List[Dict]) -> Optional[Dict[str, Any]]:
+        """
+        Reconhecimento tradicional baseado em comparação de landmarks
+        
+        Args:
+            landmarks: Lista de 21 pontos com coordenadas
+            
+        Returns:
+            Dict com letra reconhecida e similaridade ou None
+        """
+        try:
+            if not landmarks or len(landmarks) != 21:
+                return None
+            
+            # Normalizar landmarks de entrada
+            normalized_input = self._normalize_landmarks(landmarks)
+            if not normalized_input:
+                return None
+            
+            best_match = None
+            best_similarity = 0.0
+            
+            # Comparar com todos os gestos salvos
+            all_gestures = self.get_all_gestures()
+            
+            for letter, gesture_data in all_gestures.items():
+                if not gesture_data or not gesture_data.get('landmarks'):
+                    continue
+                
+                # Normalizar landmarks salvos
+                saved_landmarks = gesture_data['landmarks']
+                normalized_saved = self._normalize_landmarks(saved_landmarks)
+                if not normalized_saved:
+                    continue
+                
+                # Calcular similaridade
+                similarity = self._calculate_similarity(normalized_input, normalized_saved)
+                
+                if similarity > best_similarity:
+                    best_similarity = similarity
+                    best_match = letter
+            
+            # Retornar apenas se similaridade for razoável
+            if best_similarity > 0.3:  # Threshold mínimo
+                return {
+                    'letter': best_match,
+                    'similarity': best_similarity
+                }
+            
+            return None
+            
+        except Exception as e:
+            print(f"Erro no reconhecimento tradicional: {e}")
+            return None
+
+    def _normalize_landmarks(self, landmarks: List[Dict]) -> Optional[List[Dict]]:
+        """Normaliza landmarks para comparação consistente"""
+        try:
+            if not landmarks or len(landmarks) != 21:
+                return None
+            
+            # Converter para formato consistente se necessário
+            normalized = []
+            for point in landmarks:
+                if isinstance(point, dict):
+                    x = float(point.get('x', 0))
+                    y = float(point.get('y', 0))
+                    z = float(point.get('z', 0))
+                else:
+                    # Se for lista ou tupla
+                    x, y, z = float(point[0]), float(point[1]), float(point[2]) if len(point) > 2 else 0
+                
+                normalized.append({'x': x, 'y': y, 'z': z})
+            
+            # Normalizar posição (centrar no pulso - ponto 0)
+            wrist = normalized[0]
+            for point in normalized:
+                point['x'] -= wrist['x']
+                point['y'] -= wrist['y']
+                point['z'] -= wrist['z']
+            
+            return normalized
+            
+        except Exception as e:
+            print(f"Erro ao normalizar landmarks: {e}")
+            return None
+
+    def _calculate_similarity(self, landmarks1: List[Dict], landmarks2: List[Dict]) -> float:
+        """Calcula similaridade entre dois conjuntos de landmarks"""
+        try:
+            if len(landmarks1) != len(landmarks2) or len(landmarks1) != 21:
+                return 0.0
+            
+            total_distance = 0.0
+            max_possible_distance = 0.0
+            
+            for i in range(21):
+                p1 = landmarks1[i]
+                p2 = landmarks2[i]
+                
+                # Distância euclidiana 3D
+                distance = ((p1['x'] - p2['x']) ** 2 + 
+                           (p1['y'] - p2['y']) ** 2 + 
+                           (p1['z'] - p2['z']) ** 2) ** 0.5
+                
+                total_distance += distance
+                # Assumir distância máxima possível de 2.0 por ponto
+                max_possible_distance += 2.0
+            
+            # Converter distância para similaridade (0-1)
+            if max_possible_distance > 0:
+                similarity = 1.0 - (total_distance / max_possible_distance)
+                return max(0.0, similarity)
+            
+            return 0.0
+            
+        except Exception as e:
+            print(f"Erro ao calcular similaridade: {e}")
+            return 0.0
+
     def update_recognition_stats(self, letter: str):
         """
         Atualiza estatísticas de reconhecimento de uma letra
