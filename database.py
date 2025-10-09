@@ -86,6 +86,39 @@ class LibrasDatabase:
                 UNIQUE(user_id, letter)
             )
         ''')
+
+        # Tabela específica para estatísticas do Soletrando
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS soletrando_stats (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                letter CHARACTER(1) NOT NULL,
+                word TEXT NOT NULL,
+                word_position INTEGER NOT NULL,
+                completion_time REAL NOT NULL,
+                similarity_score REAL,
+                attempt_count INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id)
+            )
+        ''')
+
+        # Tabela para resultados do modo Desafio
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS challenge_results (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                level TEXT NOT NULL,
+                words_completed INTEGER DEFAULT 0,
+                score INTEGER DEFAULT 0,
+                time_taken INTEGER NOT NULL,
+                total_time INTEGER NOT NULL,
+                accuracy REAL DEFAULT 0,
+                words_per_minute REAL DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id)
+            )
+        ''')
         
         conn.commit()
         conn.close()
@@ -322,6 +355,368 @@ class LibrasDatabase:
         
         print(f"Limpeza concluída: {rows_deleted} sessões antigas removidas")
         return rows_deleted
+    
+    def save_soletrando_letter(self, user_id, letter, word, word_position, completion_time, similarity_score=None):
+        """Salva estatísticas de uma letra completada no Soletrando"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('''
+                INSERT INTO soletrando_stats 
+                (user_id, letter, word, word_position, completion_time, similarity_score)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (user_id, letter, word, word_position, completion_time, similarity_score))
+            
+            conn.commit()
+            print(f"Letra Soletrando salva: {letter} em '{word}' - Tempo: {completion_time:.2f}s")
+            return cursor.lastrowid
+        
+        except Exception as e:
+            print(f"Erro ao salvar letra Soletrando: {e}")
+            return None
+        finally:
+            conn.close()
+    
+    def get_soletrando_stats(self, user_id):
+        """Recupera estatísticas completas do Soletrando para um usuário"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # Estatísticas gerais
+        cursor.execute('''
+            SELECT 
+                COUNT(*) as total_letters,
+                COUNT(DISTINCT word) as total_words,
+                AVG(completion_time) as avg_time,
+                MIN(completion_time) as best_time,
+                MAX(completion_time) as worst_time,
+                AVG(similarity_score) as avg_similarity
+            FROM soletrando_stats 
+            WHERE user_id = ?
+        ''', (user_id,))
+        
+        general_stats = cursor.fetchone()
+        
+        # Estatísticas por letra
+        cursor.execute('''
+            SELECT 
+                letter,
+                COUNT(*) as attempts,
+                AVG(completion_time) as avg_time,
+                MIN(completion_time) as best_time,
+                AVG(similarity_score) as avg_similarity
+            FROM soletrando_stats 
+            WHERE user_id = ?
+            GROUP BY letter
+            ORDER BY letter
+        ''', (user_id,))
+        
+        letter_stats = cursor.fetchall()
+        
+        # Últimas palavras completadas
+        cursor.execute('''
+            SELECT 
+                word,
+                COUNT(*) as letters_count,
+                SUM(completion_time) as total_time,
+                AVG(similarity_score) as avg_similarity,
+                MIN(created_at) as started_at,
+                MAX(created_at) as completed_at
+            FROM soletrando_stats 
+            WHERE user_id = ?
+            GROUP BY word
+            ORDER BY MAX(created_at) DESC
+            LIMIT 10
+        ''', (user_id,))
+        
+        recent_words = cursor.fetchall()
+        
+        # Progresso diário (últimos 7 dias)
+        cursor.execute('''
+            SELECT 
+                DATE(created_at) as day,
+                COUNT(*) as letters_completed,
+                COUNT(DISTINCT word) as words_worked,
+                AVG(completion_time) as avg_time
+            FROM soletrando_stats 
+            WHERE user_id = ? AND created_at >= datetime('now', '-7 days')
+            GROUP BY DATE(created_at)
+            ORDER BY day DESC
+        ''', (user_id,))
+        
+        daily_progress = cursor.fetchall()
+        
+        conn.close()
+        
+        return {
+            'general': {
+                'total_letters': general_stats[0] if general_stats[0] else 0,
+                'total_words': general_stats[1] if general_stats[1] else 0,
+                'avg_time': round(general_stats[2], 2) if general_stats[2] else 0,
+                'best_time': round(general_stats[3], 2) if general_stats[3] else 0,
+                'worst_time': round(general_stats[4], 2) if general_stats[4] else 0,
+                'avg_similarity': round(general_stats[5], 2) if general_stats[5] else 0
+            },
+            'letter_stats': letter_stats,
+            'recent_words': recent_words,
+            'daily_progress': daily_progress
+        }
+    
+    def get_user_statistics(self, username):
+        """Recupera estatísticas gerais de um usuário (compatibilidade)"""
+        user_result = self.get_user(username)
+        if not user_result:
+            return {"error": "Usuário não encontrado"}
+        
+        user_id = user_result[0]
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        try:
+            # Estatísticas básicas de compatibilidade
+            cursor.execute('''
+                SELECT 
+                    COUNT(DISTINCT gs.id) as total_sessions,
+                    COALESCE(SUM(gs.words_completed), 0) as total_words,
+                    COALESCE(AVG(gs.accuracy), 0) as avg_accuracy,
+                    COALESCE(SUM(gs.total_duration), 0) as total_time
+                FROM game_sessions gs
+                WHERE gs.user_id = ?
+            ''', (user_id,))
+            
+            stats = cursor.fetchone()
+            
+            # Formatar tempo
+            total_seconds = stats[3] if stats[3] else 0
+            hours = total_seconds // 3600
+            minutes = (total_seconds % 3600) // 60
+            time_formatted = f"{int(hours):02d}:{int(minutes):02d}"
+            
+            # Sessões recentes (exemplo simplificado)
+            cursor.execute('''
+                SELECT 
+                    strftime('%d/%m', gs.start_time) as date,
+                    gs.difficulty,
+                    gs.words_completed,
+                    gs.accuracy,
+                    printf('%.1f min', CAST(gs.total_duration AS FLOAT) / 60) as duration
+                FROM game_sessions gs
+                WHERE gs.user_id = ?
+                ORDER BY gs.start_time DESC
+                LIMIT 5
+            ''', (user_id,))
+            
+            recent_sessions = []
+            for row in cursor.fetchall():
+                recent_sessions.append({
+                    'date': row[0],
+                    'difficulty': row[1] or 'geral',
+                    'words_completed': row[2] or 0,
+                    'accuracy': row[3] or 0,
+                    'duration': row[4]
+                })
+            
+            return {
+                'total_sessions': stats[0] if stats[0] else 0,
+                'total_words': stats[1] if stats[1] else 0,
+                'avg_accuracy': stats[2] if stats[2] else 0,
+                'total_time_formatted': time_formatted,
+                'recent_sessions': recent_sessions,
+                'letter_performance': []  # Por simplicidade
+            }
+            
+        except Exception as e:
+            print(f"Erro ao buscar estatísticas do usuário: {e}")
+            return {"error": f"Erro interno: {e}"}
+        finally:
+            conn.close()
+
+    # ===== MÉTODOS PARA MODO DESAFIO =====
+    def save_challenge_result(self, user_id, level, words_completed, score, time_taken):
+        """Salva resultado de uma partida do modo Desafio"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        try:
+            # Calcular métricas
+            total_time_map = {
+                'iniciante': 180,
+                'intermediario': 120,
+                'avancado': 90,
+                'expert': 60
+            }
+            
+            total_time = total_time_map.get(level, 120)
+            accuracy = (words_completed / max(words_completed + 1, 1)) * 100  # Simples cálculo
+            words_per_minute = (words_completed / max(time_taken / 60, 1)) if time_taken > 0 else 0
+            
+            cursor.execute('''
+                INSERT INTO challenge_results 
+                (user_id, level, words_completed, score, time_taken, total_time, accuracy, words_per_minute)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (user_id, level, words_completed, score, time_taken, total_time, accuracy, words_per_minute))
+            
+            result_id = cursor.lastrowid
+            conn.commit()
+            
+            print(f"Resultado do Desafio salvo - ID: {result_id}, Usuário: {user_id}, Nível: {level}")
+            return True
+            
+        except Exception as e:
+            print(f"Erro ao salvar resultado do Desafio: {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
+    
+    def get_challenge_stats(self, user_id):
+        """Recupera estatísticas completas do Desafio para um usuário"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        try:
+            # Estatísticas gerais
+            cursor.execute('''
+                SELECT 
+                    COUNT(*) as total_games,
+                    SUM(words_completed) as total_words,
+                    SUM(score) as total_score,
+                    AVG(score) as avg_score,
+                    MAX(score) as best_score,
+                    AVG(words_completed) as avg_words,
+                    MAX(words_completed) as best_words,
+                    AVG(words_per_minute) as avg_wpm,
+                    MAX(words_per_minute) as best_wpm
+                FROM challenge_results 
+                WHERE user_id = ?
+            ''', (user_id,))
+            
+            general_stats = cursor.fetchone()
+            
+            # Estatísticas por nível
+            cursor.execute('''
+                SELECT 
+                    level,
+                    COUNT(*) as games_played,
+                    AVG(words_completed) as avg_words,
+                    MAX(words_completed) as best_words,
+                    AVG(score) as avg_score,
+                    MAX(score) as best_score,
+                    AVG(words_per_minute) as avg_wpm,
+                    MAX(words_per_minute) as best_wpm
+                FROM challenge_results 
+                WHERE user_id = ?
+                GROUP BY level
+                ORDER BY 
+                    CASE level 
+                        WHEN 'iniciante' THEN 1
+                        WHEN 'intermediario' THEN 2
+                        WHEN 'avancado' THEN 3
+                        WHEN 'expert' THEN 4
+                    END
+            ''', (user_id,))
+            
+            level_stats = cursor.fetchall()
+            
+            # Últimos jogos
+            cursor.execute('''
+                SELECT 
+                    level,
+                    words_completed,
+                    score,
+                    time_taken,
+                    words_per_minute,
+                    created_at
+                FROM challenge_results 
+                WHERE user_id = ?
+                ORDER BY created_at DESC
+                LIMIT 10
+            ''', (user_id,))
+            
+            recent_games = cursor.fetchall()
+            
+            # Progresso diário (últimos 30 dias)
+            cursor.execute('''
+                SELECT 
+                    DATE(created_at) as day,
+                    COUNT(*) as games_played,
+                    SUM(words_completed) as total_words,
+                    MAX(score) as best_score,
+                    AVG(words_per_minute) as avg_wpm
+                FROM challenge_results 
+                WHERE user_id = ? AND created_at >= datetime('now', '-30 days')
+                GROUP BY DATE(created_at)
+                ORDER BY day DESC
+            ''', (user_id,))
+            
+            daily_progress = cursor.fetchall()
+            
+            return {
+                'general': {
+                    'total_games': general_stats[0] if general_stats[0] else 0,
+                    'total_words': general_stats[1] if general_stats[1] else 0,
+                    'total_score': general_stats[2] if general_stats[2] else 0,
+                    'avg_score': round(general_stats[3], 1) if general_stats[3] else 0,
+                    'best_score': general_stats[4] if general_stats[4] else 0,
+                    'avg_words': round(general_stats[5], 1) if general_stats[5] else 0,
+                    'best_words': general_stats[6] if general_stats[6] else 0,
+                    'avg_wpm': round(general_stats[7], 1) if general_stats[7] else 0,
+                    'best_wpm': round(general_stats[8], 1) if general_stats[8] else 0
+                },
+                'level_stats': level_stats,
+                'recent_games': recent_games,
+                'daily_progress': daily_progress
+            }
+            
+        except Exception as e:
+            print(f"Erro ao buscar estatísticas do Desafio: {e}")
+            return {}
+        finally:
+            conn.close()
+    
+    def get_challenge_ranking(self, level, limit=10):
+        """Obtém ranking do Desafio por nível"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('''
+                SELECT 
+                    u.username,
+                    cr.words_completed,
+                    cr.score,
+                    cr.words_per_minute,
+                    cr.time_taken,
+                    cr.created_at
+                FROM challenge_results cr
+                JOIN users u ON cr.user_id = u.id
+                WHERE cr.level = ?
+                ORDER BY cr.score DESC, cr.words_completed DESC, cr.time_taken ASC
+                LIMIT ?
+            ''', (level, limit))
+            
+            ranking_data = cursor.fetchall()
+            
+            ranking = []
+            for i, row in enumerate(ranking_data, 1):
+                ranking.append({
+                    'position': i,
+                    'username': row[0],
+                    'words_completed': row[1],
+                    'score': row[2],
+                    'words_per_minute': round(row[3], 1),
+                    'time_taken': row[4],
+                    'date': row[5][:10]  # Apenas data, sem hora
+                })
+            
+            return ranking
+            
+        except Exception as e:
+            print(f"Erro ao buscar ranking do Desafio: {e}")
+            return []
+        finally:
+            conn.close()
 
 def save_game_session(username, mode, difficulty, word, completed, time_spent, total_time, letters_completed, total_letters, accuracy):
     """Função helper para salvar resultado de uma sessão de jogo"""

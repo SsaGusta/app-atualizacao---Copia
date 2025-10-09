@@ -13,14 +13,13 @@
             <p class="lead">Detecção em tempo real usando MediaPipe</p>
         </div>
 
-        <!-- Video Container -->
+        <!-- Video/Camera Container -->
         <div class="card shadow-sm mb-4">
             <div class="card-body text-center">
                 <div class="video-container position-relative d-inline-block">
                     <video id="input_video" style="display: none;" playsinline></video>
                     <canvas id="output_canvas" class="border rounded" style="max-width: 100%; height: auto;"></canvas>
                 </div>
-                
                 <!-- Controls -->
                 <div class="mt-3 mediapipe-controls">
                     <button id="start_button" class="btn btn-primary btn-lg me-2">
@@ -30,7 +29,6 @@
                         <i class="fas fa-stop"></i> Parar Câmera
                     </button>
                 </div>
-                
                 <!-- Status -->
                 <div class="mt-3">
                     <div class="alert alert-info" role="alert">
@@ -40,7 +38,7 @@
             </div>
         </div>
 
-        <!-- Information Panel -->
+        <!-- Game Stats and Progress -->
         <div class="row">
             <div class="col-md-6">
                 <div class="card">
@@ -51,16 +49,25 @@
                         <div id="hand_count" class="mb-2">
                             <strong>Mãos detectadas:</strong> 0
                         </div>
-                        <div id="detection_confidence" class="mb-2">
-                            <strong>Confiança:</strong> -
-                        </div>
                         <div id="fps_counter">
                             <strong>FPS:</strong> -
+                        </div>
+                        <div class="mt-3">
+                            <strong>Letra Detectada:</strong> <span id="detectedLetter" style="font-size: 1.2em; color: #28a745; transition: all 0.2s ease-in-out;" title="Passe o mouse para ver detalhes">-</span>
+                        </div>
+                        <div class="mt-2" id="recognitionDetails" style="font-size: 0.85em; color: #6c757d; display: none;">
+                            <div><strong>Análise:</strong> <span id="analysisInfo">-</span></div>
+                        </div>
+                        <div class="mt-2" id="pointLegend" style="font-size: 0.8em; line-height: 1.3; display: none;">
+                            <strong>Legenda dos pontos:</strong><br>
+                            <span style="color: #00FF00;">●</span> Excelente 
+                            <span style="color: #90EE90;">●</span> Bom 
+                            <span style="color: #FFA500;">●</span> Aceitável 
+                            <span style="color: #FF4444;">●</span> Ruim
                         </div>
                     </div>
                 </div>
             </div>
-            
             <div class="col-md-6">
                 <div class="card">
                     <div class="card-header">
@@ -97,11 +104,6 @@
             <a href="{{ url_for('index') }}" class="btn btn-outline-primary">
                 <i class="fas fa-arrow-left"></i> Voltar ao Início
             </a>
-            {% if session.username %}
-            <a href="{{ url_for('game') }}" class="btn btn-outline-success">
-                <i class="fas fa-gamepad"></i> Ir para o Jogo
-            </a>
-            {% endif %}
         </div>
     </div>
 </div>
@@ -109,22 +111,52 @@
 
 {% block scripts %}
 <!-- MediaPipe Dependencies -->
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous" onload="console.log('Camera utils carregado')" onerror="console.error('Erro ao carregar camera utils')"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous" onload="console.log('Control utils carregado')" onerror="console.error('Erro ao carregar control utils')"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous" onload="console.log('Drawing utils carregado')" onerror="console.error('Erro ao carregar drawing utils')"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous" onload="console.log('Hands carregado')" onerror="console.error('Erro ao carregar hands')"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 
-<!-- Custom MediaPipe Script -->
-<script src="{{ url_for('static', filename='js/mediapipe-hands.js') }}" onload="console.log('Script customizado carregado')" onerror="console.error('Erro ao carregar script customizado')"></script>
+<!-- Custom MediaPipe Scripts -->
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="{{ url_for('static', filename='js/mediapipe-hands.js') }}"></script>
 
 <script>
-// Verificação adicional de carregamento
+// Inicialização simplificada - apenas MediaPipe
 window.addEventListener('load', function() {
-    console.log('Página carregada completamente');
-    console.log('Camera disponível:', typeof Camera !== 'undefined');
-    console.log('Hands disponível:', typeof Hands !== 'undefined');
-    console.log('drawConnectors disponível:', typeof drawConnectors !== 'undefined');
-    console.log('drawLandmarks disponível:', typeof drawLandmarks !== 'undefined');
+    console.log('Página carregada - iniciando MediaPipe Hand Tracking');
+    
+    // Aguardar carregamento das bibliotecas MediaPipe
+    setTimeout(() => {
+        console.log('Verificando dependências MediaPipe...');
+        console.log('Camera disponível:', typeof Camera !== 'undefined');
+        console.log('Hands disponível:', typeof Hands !== 'undefined');
+        console.log('drawConnectors disponível:', typeof drawConnectors !== 'undefined');
+        console.log('drawLandmarks disponível:', typeof drawLandmarks !== 'undefined');
+        
+        // Inicializar HandTracker
+        if (typeof HandTracker !== 'undefined' && document.getElementById('output_canvas')) {
+            console.log('Inicializando HandTracker...');
+            try {
+                window.handTracker = new HandTracker();
+                console.log('✅ HandTracker inicializado com sucesso');
+                
+                const statusElement = document.getElementById('status');
+                if (statusElement) {
+                    statusElement.textContent = 'Sistema pronto - clique em "Iniciar Câmera"';
+                }
+                
+            } catch (error) {
+                console.error('❌ Erro ao inicializar HandTracker:', error);
+                const statusElement = document.getElementById('status');
+                if (statusElement) {
+                    statusElement.textContent = 'Erro na inicialização: ' + error.message;
+                }
+            }
+        } else {
+            console.error('❌ Dependências não disponíveis');
+        }
+        
+    }, 1500);
 });
 </script>
 {% endblock %}

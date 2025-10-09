@@ -48,8 +48,14 @@
                 <h3 class="mb-3">Bem-vindo de volta, {{ session.username }}!</h3>
                 <p class="mb-4">Pronto para continuar praticando?</p>
                 <div class="d-grid gap-2 d-md-block">
-                    <a href="{{ url_for('game') }}" class="btn btn-primary btn-lg me-md-2">
-                        <i class="fas fa-play"></i> Continuar Praticando
+                    <a href="{{ url_for('mediapipe') }}" class="btn btn-primary btn-lg me-md-2">
+                        <i class="fas fa-hands"></i> Reconhecimento de Mãos
+                    </a>
+                    <a href="{{ url_for('soletrando') }}" class="btn btn-success btn-lg me-md-2">
+                        <i class="fas fa-spell-check"></i> Jogo Soletrando
+                    </a>
+                    <a href="{{ url_for('desafio') }}" class="btn btn-warning btn-lg me-md-2">
+                        <i class="fas fa-stopwatch"></i> Desafio
                     </a>
                     <a href="{{ url_for('statistics') }}" class="btn btn-outline-primary btn-lg">
                         <i class="fas fa-chart-bar"></i> Ver Progresso
@@ -57,11 +63,240 @@
                 </div>
                 {% else %}
                 <h3 class="mb-3">Comece sua Jornada</h3>
-                <p class="mb-4">Faça login para começar a aprender Libras de forma interativa</p>
-                <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg">
-                    <i class="fas fa-sign-in-alt"></i> Entrar e Começar
+                <p class="mb-4">Experimente nossos recursos ou faça login para salvar seu progresso</p>
+                <div class="d-grid gap-2 d-md-block mb-3">
+                    <a href="{{ url_for('mediapipe') }}" class="btn btn-primary btn-lg me-md-2">
+                        <i class="fas fa-hands"></i> Reconhecimento de Mãos
+                    </a>
+                    <a href="{{ url_for('soletrando') }}" class="btn btn-success btn-lg me-md-2">
+                        <i class="fas fa-spell-check"></i> Jogo Soletrando
+                    </a>
+                    <a href="{{ url_for('desafio') }}" class="btn btn-warning btn-lg me-md-2">
+                        <i class="fas fa-stopwatch"></i> Desafio
+                    </a>
+                </div>
+                <a href="{{ url_for('login') }}" class="btn btn-outline-primary btn-lg">
+                    <i class="fas fa-sign-in-alt"></i> Faça Login para Salvar Progresso
                 </a>
                 {% endif %}
+            </div>
+        </div>
+
+        <!-- Modos de Jogo -->
+        <div class="mt-5">
+            <h3 class="text-center mb-4">
+                <i class="fas fa-gamepad"></i> Modos de Jogo
+            </h3>
+            
+            <!-- Modos Atuais -->
+            <div class="mb-4">
+                <h5 class="text-success mb-3">
+                    <i class="fas fa-check-circle"></i> Disponíveis Agora
+                </h5>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100 border-success">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center mb-3">
+                                    <i class="fas fa-hands fa-2x text-primary me-3"></i>
+                                    <div>
+                                        <h6 class="card-title mb-1">Reconhecimento de Mãos</h6>
+                                        <span class="badge bg-success">Ativo</span>
+                                    </div>
+                                </div>
+                                <p class="card-text small text-muted">
+                                    Pratique sinais individuais de letras com feedback em tempo real usando MediaPipe AI.
+                                </p>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <small class="text-muted">
+                                        <i class="fas fa-users"></i> Modo Individual
+                                    </small>
+                                    {% if session.username %}
+                                    <a href="{{ url_for('mediapipe') }}" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-play"></i> Jogar
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100 border-success">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center mb-3">
+                                    <i class="fas fa-spell-check fa-2x text-success me-3"></i>
+                                    <div>
+                                        <h6 class="card-title mb-1">Soletrando</h6>
+                                        <span class="badge bg-success">Ativo</span>
+                                        <span class="badge bg-warning text-dark ms-1">ML</span>
+                                    </div>
+                                </div>
+                                <p class="card-text small text-muted">
+                                    Digite palavras e soletre usando gestos LIBRAS. Sistema com Machine Learning que aprende com seus gestos.
+                                </p>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <small class="text-muted">
+                                        <i class="fas fa-brain"></i> Com IA Adaptativa
+                                    </small>
+                                    {% if session.username %}
+                                    <a href="{{ url_for('soletrando') }}" class="btn btn-sm btn-success">
+                                        <i class="fas fa-play"></i> Jogar
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100 border-success">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center mb-3">
+                                    <i class="fas fa-stopwatch fa-2x text-warning me-3"></i>
+                                    <div>
+                                        <h6 class="card-title mb-1">Desafio</h6>
+                                        <span class="badge bg-success">Ativo</span>
+                                        <span class="badge bg-danger ms-1">Novo!</span>
+                                    </div>
+                                </div>
+                                <p class="card-text small text-muted">
+                                    Modo contra o tempo! Faça o máximo de palavras possível em diferentes níveis de dificuldade.
+                                </p>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <small class="text-muted">
+                                        <i class="fas fa-trophy"></i> Competitivo
+                                    </small>
+                                    {% if session.username %}
+                                    <a href="{{ url_for('desafio') }}" class="btn btn-sm btn-warning">
+                                        <i class="fas fa-play"></i> Jogar
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modos Futuros -->
+            <div class="mb-4">
+                <h5 class="text-info mb-3">
+                    <i class="fas fa-clock"></i> Em Desenvolvimento
+                </h5>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100 border-info">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center mb-3">
+                                    <i class="fas fa-puzzle-piece fa-2x text-info me-3"></i>
+                                    <div>
+                                        <h6 class="card-title mb-1">Quebra-Cabeças</h6>
+                                        <span class="badge bg-info">Em Breve</span>
+                                    </div>
+                                </div>
+                                <p class="card-text small text-muted">
+                                    Monte palavras arrastando letras em LIBRAS para formar palavras completas.
+                                </p>
+                                <small class="text-muted">
+                                    <i class="fas fa-mouse-pointer"></i> Drag & Drop
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100 border-info">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center mb-3">
+                                    <i class="fas fa-users fa-2x text-purple me-3"></i>
+                                    <div>
+                                        <h6 class="card-title mb-1">Multiplayer</h6>
+                                        <span class="badge bg-info">Planejado</span>
+                                    </div>
+                                </div>
+                                <p class="card-text small text-muted">
+                                    Jogue com amigos online, desafios em tempo real e salas de prática colaborativa.
+                                </p>
+                                <small class="text-muted">
+                                    <i class="fas fa-wifi"></i> Online
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100 border-info">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center mb-3">
+                                    <i class="fas fa-brain fa-2x text-info me-3"></i>
+                                    <div>
+                                        <h6 class="card-title mb-1">IA Avançada</h6>
+                                        <span class="badge bg-info">Futuro</span>
+                                    </div>
+                                </div>
+                                <p class="card-text small text-muted">
+                                    Reconhecimento de gestos completos, não apenas letras, usando redes neurais avançadas.
+                                </p>
+                                <small class="text-muted">
+                                    <i class="fas fa-robot"></i> Deep Learning
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recursos Especiais -->
+            <div class="mb-4">
+                <h5 class="text-warning mb-3">
+                    <i class="fas fa-star"></i> Recursos Especiais
+                </h5>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100 border-warning">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center mb-3">
+                                    <i class="fas fa-chart-line fa-2x text-success me-3"></i>
+                                    <div>
+                                        <h6 class="card-title mb-1">Estatísticas Detalhadas</h6>
+                                        <span class="badge bg-success">Ativo</span>
+                                    </div>
+                                </div>
+                                <p class="card-text small text-muted">
+                                    Acompanhe seu progresso, veja estatísticas por letra, precisão e evolução ao longo do tempo.
+                                </p>
+                                {% if session.username %}
+                                <a href="{{ url_for('statistics') }}" class="btn btn-sm btn-outline-success">
+                                    <i class="fas fa-chart-bar"></i> Ver Estatísticas
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100 border-warning">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center mb-3">
+                                    <i class="fas fa-robot fa-2x text-warning me-3"></i>
+                                    <div>
+                                        <h6 class="card-title mb-1">Sistema ML Adaptativo</h6>
+                                        <span class="badge bg-warning text-dark">Ativo</span>
+                                    </div>
+                                </div>
+                                <p class="card-text small text-muted">
+                                    Inteligência artificial que aprende com seus gestos e melhora a precisão automaticamente.
+                                </p>
+                                {% if session.username and session.admin %}
+                                <a href="{{ url_for('ml_admin') }}" class="btn btn-sm btn-outline-warning">
+                                    <i class="fas fa-cogs"></i> Admin ML
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -76,8 +311,8 @@
                 </div>
                 <div class="col-md-3 text-center mb-3">
                     <div class="step-number">2</div>
-                    <h6>Escolha o Nível</h6>
-                    <p class="small text-muted">Iniciante, intermediário, avançado ou expert</p>
+                    <h6>Escolha o Modo</h6>
+                    <p class="small text-muted">Reconhecimento individual ou jogo Soletrando</p>
                 </div>
                 <div class="col-md-3 text-center mb-3">
                     <div class="step-number">3</div>

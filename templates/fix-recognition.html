@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🔧 Ajustar Configurações de Reconhecimento</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .config-section { background: #e9ecef; padding: 20px; margin: 15px 0; border-radius: 8px; border-left: 4px solid #007bff; }
+        .success { color: #28a745; font-weight: bold; }
+        .error { color: #dc3545; font-weight: bold; }
+        .warning { color: #ffc107; font-weight: bold; }
+        button { padding: 12px 20px; margin: 8px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .slider-container { margin: 15px 0; }
+        .slider { width: 100%; }
+        .current-value { font-size: 18px; font-weight: bold; color: #007bff; }
+        #output { background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 15px 0; white-space: pre-wrap; max-height: 300px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Ajustar Configurações de Reconhecimento</h1>
+        <p>Se a letra A não está sendo reconhecida, você pode ajustar os parâmetros aqui.</p>
+        
+        <div class="config-section">
+            <h3>⚖️ Threshold de Confiança</h3>
+            <p>Quanto menor, mais "tolerante" o sistema fica (mais fácil reconhecer)</p>
+            
+            <div class="slider-container">
+                <label for="confidenceSlider">Confiança mínima: <span id="confidenceValue" class="current-value">75%</span></label>
+                <input type="range" id="confidenceSlider" class="slider" min="40" max="95" value="75" 
+                       oninput="updateConfidenceValue(this.value)">
+            </div>
+            
+            <p><strong>Recomendações:</strong></p>
+            <ul>
+                <li>🟢 <strong>60-70%:</strong> Mais tolerante (recomendado para testes)</li>
+                <li>🟡 <strong>75-80%:</strong> Balanceado (padrão atual)</li>
+                <li>🔴 <strong>85-95%:</strong> Muito rigoroso (pode não reconhecer nada)</li>
+            </ul>
+            
+            <button onclick="testWithCurrentThreshold()">🧪 Testar com Threshold Atual</button>
+            <button onclick="findOptimalThreshold()">🎯 Encontrar Threshold Ideal</button>
+        </div>
+        
+        <div class="config-section">
+            <h3>🔄 Estabilidade</h3>
+            <p>Quantos frames seguidos o sistema precisa detectar a letra para confirmar</p>
+            
+            <div class="slider-container">
+                <label for="stabilitySlider">Frames para estabilidade: <span id="stabilityValue" class="current-value">3</span></label>
+                <input type="range" id="stabilitySlider" class="slider" min="1" max="10" value="3" 
+                       oninput="updateStabilityValue(this.value)">
+            </div>
+            
+            <button onclick="testStability()">🔄 Testar Estabilidade</button>
+        </div>
+        
+        <div class="config-section">
+            <h3>🚀 Ações Rápidas</h3>
+            <button onclick="setEasyMode()">😊 Modo Fácil (60% threshold)</button>
+            <button onclick="setNormalMode()">😐 Modo Normal (75% threshold)</button>
+            <button onclick="setHardMode()">😤 Modo Difícil (85% threshold)</button>
+        </div>
+        
+        <div class="config-section">
+            <h3>🎯 Diagnóstico Específico da Letra A</h3>
+            <button onclick="diagnoseLetterA()">🔍 Diagnosticar Letra A</button>
+            <button onclick="testLetterAWithVariations()">🎲 Testar A com Variações</button>
+            <button onclick="simulateGameScenario()">🎮 Simular Cenário do Jogo</button>
+        </div>
+        
+        <div id="output">Clique em um botão para começar os testes...</div>
+    </div>
+
+    <script src="/static/js/custom-gesture-recognizer.js"></script>
+    <script>
+        const output = document.getElementById('output');
+        let recognizer = null;
+        
+        function log(message) {
+            output.textContent += new Date().toLocaleTimeString() + ': ' + message + '\n';
+            output.scrollTop = output.scrollHeight;
+        }
+        
+        function clearOutput() {
+            output.textContent = '';
+        }
+        
+        function updateConfidenceValue(value) {
+            document.getElementById('confidenceValue').textContent = value + '%';
+        }
+        
+        function updateStabilityValue(value) {
+            document.getElementById('stabilityValue').textContent = value;
+        }
+        
+        async function initRecognizer() {
+            if (!recognizer) {
+                recognizer = new CustomGestureRecognizer();
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+            return recognizer;
+        }
+        
+        async function testWithCurrentThreshold() {
+            clearOutput();
+            const thresholdValue = document.getElementById('confidenceSlider').value / 100;
+            
+            log(`🧪 Testando com threshold: ${(thresholdValue * 100).toFixed(0)}%`);
+            
+            await initRecognizer();
+            
+            // Modificar threshold temporariamente
+            const originalThreshold = recognizer.confidenceThreshold;
+            recognizer.confidenceThreshold = thresholdValue;
+            
+            try {
+                // Buscar letra A
+                const response = await fetch('/api/get_gestures');
+                const gestures = await response.json();
+                
+                if (!gestures.A) {
+                    log('❌ Letra A não foi capturada ainda!');
+                    log('💡 Vá para /admin e capture a letra A primeiro');
+                    return;
+                }
+                
+                log('✅ Letra A encontrada no banco');
+                
+                // Testar reconhecimento
+                const result = await recognizer.recognizeLetter(gestures.A.landmarks);
+                
+                if (result && result.letter === 'A') {
+                    log(`✅ SUCESSO! Letra A reconhecida com ${(result.confidence * 100).toFixed(1)}% de confiança`);
+                    log('💡 Este threshold funciona! Use-o no jogo.');
+                } else if (result) {
+                    log(`⚠️ Reconheceu '${result.letter}' ao invés de 'A' (${(result.confidence * 100).toFixed(1)}%)`);
+                } else {
+                    log('❌ Nenhuma letra reconhecida com este threshold');
+                    log('💡 Tente diminuir o threshold ou recapturar a letra A');
+                }
+                
+            } finally {
+                // Restaurar threshold original
+                recognizer.confidenceThreshold = originalThreshold;
+            }
+        }
+        
+        async function findOptimalThreshold() {
+            clearOutput();
+            log('🎯 Procurando threshold ideal para a letra A...');
+            
+            await initRecognizer();
+            
+            const response = await fetch('/api/get_gestures');
+            const gestures = await response.json();
+            
+            if (!gestures.A) {
+                log('❌ Letra A não disponível');
+                return;
+            }
+            
+            const testThresholds = [0.4, 0.5, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95];
+            let bestThreshold = null;
+            
+            for (const threshold of testThresholds) {
+                recognizer.confidenceThreshold = threshold;
+                
+                const result = await recognizer.recognizeLetter(gestures.A.landmarks);
+                
+                if (result && result.letter === 'A') {
+                    log(`✅ ${(threshold * 100).toFixed(0)}%: APROVADO (confiança: ${(result.confidence * 100).toFixed(1)}%)`);
+                    if (!bestThreshold) bestThreshold = threshold;
+                } else {
+                    log(`❌ ${(threshold * 100).toFixed(0)}%: REPROVADO`);
+                }
+            }
+            
+            if (bestThreshold) {
+                log(`\n🎉 THRESHOLD IDEAL ENCONTRADO: ${(bestThreshold * 100).toFixed(0)}%`);
+                log('💡 Ajuste o slider para este valor e teste no jogo!');
+                
+                // Atualizar slider
+                document.getElementById('confidenceSlider').value = bestThreshold * 100;
+                updateConfidenceValue(bestThreshold * 100);
+            } else {
+                log('\n❌ Nenhum threshold funcionou!');
+                log('💡 Problemas possíveis:');
+                log('   - Letra A foi capturada com qualidade muito baixa');
+                log('   - Algoritmo de similaridade precisa ajuste');
+                log('   - Landmarks corrompidos');
+            }
+        }
+        
+        async function setEasyMode() {
+            document.getElementById('confidenceSlider').value = 60;
+            updateConfidenceValue(60);
+            await testWithCurrentThreshold();
+        }
+        
+        async function setNormalMode() {
+            document.getElementById('confidenceSlider').value = 75;
+            updateConfidenceValue(75);
+            await testWithCurrentThreshold();
+        }
+        
+        async function setHardMode() {
+            document.getElementById('confidenceSlider').value = 85;
+            updateConfidenceValue(85);
+            await testWithCurrentThreshold();
+        }
+        
+        async function testStability() {
+            clearOutput();
+            const stabilityFrames = parseInt(document.getElementById('stabilitySlider').value);
+            
+            log(`🔄 Testando estabilidade com ${stabilityFrames} frames`);
+            
+            await initRecognizer();
+            
+            const response = await fetch('/api/get_gestures');
+            const gestures = await response.json();
+            
+            if (!gestures.A) {
+                log('❌ Letra A não disponível');
+                return;
+            }
+            
+            // Modificar temporariamente
+            const originalStability = recognizer.stabilityFrames;
+            recognizer.stabilityFrames = stabilityFrames;
+            recognizer.reset(); // Limpar contadores
+            
+            try {
+                log('Simulando detecções sequenciais...');
+                
+                for (let frame = 1; frame <= stabilityFrames + 2; frame++) {
+                    const result = await recognizer.recognizeLetter(gestures.A.landmarks);
+                    
+                    if (result) {
+                        log(`Frame ${frame}: ${result.letter} (${(result.confidence * 100).toFixed(1)}%) - Estável: ${result.stable}`);
+                        
+                        if (result.stable) {
+                            log(`✅ Letra estabilizada no frame ${frame}!`);
+                            break;
+                        }
+                    } else {
+                        log(`Frame ${frame}: Não reconhecido`);
+                    }
+                }
+                
+            } finally {
+                recognizer.stabilityFrames = originalStability;
+            }
+        }
+        
+        async function diagnoseLetterA() {
+            clearOutput();
+            log('🔍 DIAGNÓSTICO ESPECÍFICO DA LETRA A');
+            log('='.repeat(35));
+            
+            // Verificar se existe
+            const response = await fetch('/api/get_gestures');
+            const gestures = await response.json();
+            
+            if (!gestures.A) {
+                log('❌ PROBLEMA ENCONTRADO: Letra A não foi capturada!');
+                log('💡 SOLUÇÃO: Vá para /admin e capture a letra A');
+                return;
+            }
+            
+            const letterA = gestures.A;
+            log(`✅ Letra A encontrada:`);
+            log(`   📊 Qualidade: ${letterA.quality}%`);
+            log(`   📅 Capturada: ${new Date(letterA.created_at).toLocaleString()}`);
+            
+            // Verificar qualidade dos landmarks
+            let validLandmarks = 0;
+            letterA.landmarks.forEach(point => {
+                if (point.x >= 0 && point.x <= 1 && point.y >= 0 && point.y <= 1) {
+                    validLandmarks++;
+                }
+            });
+            
+            log(`   📍 Landmarks válidos: ${validLandmarks}/21`);
+            
+            if (validLandmarks < 21) {
+                log('⚠️ PROBLEMA: Alguns landmarks estão fora dos limites!');
+                log('💡 SOLUÇÃO: Recapture a letra A com melhor posicionamento');
+            }
+            
+            if (letterA.quality < 70) {
+                log('⚠️ PROBLEMA: Qualidade baixa da captura!');
+                log('💡 SOLUÇÃO: Recapture com melhor iluminação e posição da mão');
+            }
+            
+            // Testar reconhecimento via API
+            log('\n🧪 Testando reconhecimento via API...');
+            
+            try {
+                const apiResponse = await fetch('/api/recognize_gesture', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ landmarks: letterA.landmarks })
+                });
+                
+                const apiResult = await apiResponse.json();
+                
+                if (apiResult.success && apiResult.result.letter === 'A') {
+                    log(`✅ API reconheceu corretamente: ${(apiResult.result.confidence * 100).toFixed(1)}%`);
+                } else {
+                    log(`❌ API falhou: ${apiResult.error || 'Não reconhecido'}`);
+                }
+                
+            } catch (error) {
+                log(`❌ Erro na API: ${error.message}`);
+            }
+            
+            // Testar com reconhecedor local
+            log('\n🤖 Testando com reconhecedor local...');
+            
+            await initRecognizer();
+            const localResult = await recognizer.recognizeLetter(letterA.landmarks);
+            
+            if (localResult && localResult.letter === 'A') {
+                log(`✅ Reconhecedor local funcionou: ${(localResult.confidence * 100).toFixed(1)}%`);
+            } else {
+                log(`❌ Reconhecedor local falhou`);
+                log('💡 Tente diminuir o threshold de confiança');
+            }
+        }
+        
+        async function testLetterAWithVariations() {
+            clearOutput();
+            log('🎲 Testando letra A com diferentes variações...');
+            
+            await initRecognizer();
+            
+            const response = await fetch('/api/get_gestures');
+            const gestures = await response.json();
+            
+            if (!gestures.A) {
+                log('❌ Letra A não disponível');
+                return;
+            }
+            
+            const variations = [
+                { name: 'Landmarks originais', factor: 0 },
+                { name: 'Variação mínima (1%)', factor: 0.01 },
+                { name: 'Variação pequena (2%)', factor: 0.02 },
+                { name: 'Variação média (3%)', factor: 0.03 },
+                { name: 'Variação grande (5%)', factor: 0.05 }
+            ];
+            
+            for (const variation of variations) {
+                const testLandmarks = gestures.A.landmarks.map(point => ({
+                    x: point.x + (Math.random() - 0.5) * variation.factor,
+                    y: point.y + (Math.random() - 0.5) * variation.factor,
+                    z: point.z + (Math.random() - 0.5) * variation.factor * 0.5
+                }));
+                
+                const result = await recognizer.recognizeLetter(testLandmarks);
+                
+                if (result && result.letter === 'A') {
+                    log(`✅ ${variation.name}: Reconhecido (${(result.confidence * 100).toFixed(1)}%)`);
+                } else if (result) {
+                    log(`⚠️ ${variation.name}: Reconheceu '${result.letter}' (${(result.confidence * 100).toFixed(1)}%)`);
+                } else {
+                    log(`❌ ${variation.name}: Não reconhecido`);
+                }
+            }
+        }
+        
+        async function simulateGameScenario() {
+            clearOutput();
+            log('🎮 Simulando cenário real do jogo...');
+            
+            log('1️⃣ Inicializando como no jogo...');
+            const gameRecognizer = new CustomGestureRecognizer();
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            log('2️⃣ Verificando gestos carregados...');
+            const stats = gameRecognizer.getRecognitionStats();
+            
+            if (!stats.gesturesLoaded) {
+                log('❌ Gestos não carregaram no jogo!');
+                log('💡 Recarregue a página do jogo');
+                return;
+            }
+            
+            if (!stats.availableLetters.includes('A')) {
+                log('❌ Letra A não disponível no jogo!');
+                log('💡 Capture a letra A em /admin');
+                return;
+            }
+            
+            log(`✅ ${stats.totalGestures} gestos carregados`);
+            log(`📋 Letras: ${stats.availableLetters.join(', ')}`);
+            
+            log('3️⃣ Simulando múltiplas tentativas de reconhecimento...');
+            
+            const response = await fetch('/api/get_gestures');
+            const gestures = await response.json();
+            const testLandmarks = gestures.A.landmarks;
+            
+            let successCount = 0;
+            const totalAttempts = 10;
+            
+            for (let i = 1; i <= totalAttempts; i++) {
+                // Adicionar pequena variação como no mundo real
+                const noisyLandmarks = testLandmarks.map(point => ({
+                    x: point.x + (Math.random() - 0.5) * 0.02,
+                    y: point.y + (Math.random() - 0.5) * 0.02,
+                    z: point.z + (Math.random() - 0.5) * 0.01
+                }));
+                
+                const result = await gameRecognizer.recognizeLetter(noisyLandmarks);
+                
+                if (result && result.letter === 'A' && result.stable) {
+                    successCount++;
+                    log(`✅ Tentativa ${i}: SUCESSO (${(result.confidence * 100).toFixed(1)}%)`);
+                } else if (result && result.letter === 'A') {
+                    log(`🟡 Tentativa ${i}: Detectado mas não estável (${(result.confidence * 100).toFixed(1)}%)`);
+                } else if (result) {
+                    log(`❌ Tentativa ${i}: Reconheceu '${result.letter}' (${(result.confidence * 100).toFixed(1)}%)`);
+                } else {
+                    log(`❌ Tentativa ${i}: Não reconhecido`);
+                }
+                
+                // Pequena pausa entre tentativas
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            
+            const successRate = (successCount / totalAttempts) * 100;
+            log(`\n📊 RESULTADO FINAL:`);
+            log(`   Taxa de sucesso: ${successRate.toFixed(1)}% (${successCount}/${totalAttempts})`);
+            
+            if (successRate >= 70) {
+                log(`✅ Excelente! O sistema deve funcionar bem no jogo.`);
+            } else if (successRate >= 40) {
+                log(`⚠️ Funcionamento parcial. Considere ajustar threshold ou recapturar.`);
+            } else {
+                log(`❌ Taxa muito baixa. Sistema precisa de ajustes.`);
+                log(`💡 Sugestões:`);
+                log(`   - Diminuir threshold para 60-65%`);
+                log(`   - Recapturar letra A com melhor qualidade`);
+                log(`   - Verificar se MediaPipe está funcionando corretamente`);
+            }
+        }
+    </script>
+</body>
+</html>

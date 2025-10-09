@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🔍 Debug Completo - Isolamento do Problema</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .test-section { background: #e9ecef; padding: 20px; margin: 15px 0; border-radius: 8px; border-left: 4px solid #007bff; }
+        .success { color: #28a745; font-weight: bold; }
+        .error { color: #dc3545; font-weight: bold; }
+        .warning { color: #ffc107; font-weight: bold; }
+        button { padding: 12px 20px; margin: 8px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        button.danger { background: #dc3545; }
+        button.danger:hover { background: #c82333; }
+        #output { background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 15px 0; white-space: pre-wrap; max-height: 400px; overflow-y: auto; font-family: monospace; font-size: 12px; }
+        .side-by-side { display: flex; gap: 20px; }
+        .column { flex: 1; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Debug Completo - Isolamento do Problema</h1>
+        <p>Vamos descobrir exatamente de onde vêm essas letras falsas (J, L, G, M).</p>
+        
+        <div class="test-section">
+            <h3>🚫 PRIMEIRO: Eliminar Suspeitos</h3>
+            <button onclick="checkOldSystems()">1. Verificar Sistemas Antigos</button>
+            <button onclick="testAPIDirectly()">2. Testar API Diretamente</button>
+            <button onclick="testRecognizerIsolated()">3. Testar Reconhecedor Isolado</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>🔍 SEGUNDO: Interceptar Tudo</h3>
+            <button onclick="interceptAllRecognition()">4. Interceptar Todo Reconhecimento</button>
+            <button onclick="monitorAPITraffic()">5. Monitorar Tráfego da API</button>
+            <button onclick="trackLetterSources()">6. Rastrear Fonte das Letras</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>🛠️ TERCEIRO: Corrigir na Fonte</h3>
+            <button class="danger" onclick="disableAllFallbacks()">7. Desabilitar TODOS os Fallbacks</button>
+            <button class="danger" onclick="forceOnlyDatabase()">8. Forçar APENAS Banco de Dados</button>
+            <button onclick="testWithCleanSetup()">9. Teste com Setup Limpo</button>
+        </div>
+        
+        <div id="output">Clique em um teste para começar...</div>
+    </div>
+
+    <!-- NÃO carregar nenhum script do sistema antigo -->
+    <script src="{{ url_for('static', filename='js/custom-gesture-recognizer.js') }}"></script>
+    
+    <script>
+        const output = document.getElementById('output');
+        let recognizer = null;
+        
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            output.textContent += `[${timestamp}] ${message}\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+        
+        function clearOutput() {
+            output.textContent = '';
+        }
+        
+        async function checkOldSystems() {
+            clearOutput();
+            log('🔍 VERIFICANDO SISTEMAS ANTIGOS...');
+            log('='.repeat(50));
+            
+            // Verificar se existem classes antigas
+            const suspects = [
+                'LibrasLetterRecognizer',
+                'AdvancedLibrasRecognizer', 
+                'OptimizedLibrasRecognizer',
+                'LibrasRecognizer'
+            ];
+            
+            for (const suspect of suspects) {
+                if (typeof window[suspect] !== 'undefined') {
+                    log(`❌ ENCONTRADO SISTEMA ANTIGO: ${suspect}`);
+                    log(`   - Tipo: ${typeof window[suspect]}`);
+                    log(`   - É construtor: ${typeof window[suspect] === 'function'}`);
+                } else {
+                    log(`✅ ${suspect}: não encontrado`);
+                }
+            }
+            
+            // Verificar instâncias globais
+            const globalVars = [
+                'librasRecognizer',
+                'gestureRecognizer',
+                'handRecognizer',
+                'letterRecognizer'
+            ];
+            
+            log('\n🔍 Verificando variáveis globais...');
+            for (const varName of globalVars) {
+                if (typeof window[varName] !== 'undefined') {
+                    log(`❌ ENCONTRADA VARIÁVEL GLOBAL: ${varName}`);
+                    log(`   - Tipo: ${typeof window[varName]}`);
+                    log(`   - Construtor: ${window[varName].constructor.name}`);
+                } else {
+                    log(`✅ ${varName}: não encontrado`);
+                }
+            }
+            
+            log('\n📊 RESULTADO: Se há sistemas antigos ativos, eles podem estar gerando letras falsas!');
+        }
+        
+        async function testAPIDirectly() {
+            log('\n🧪 TESTANDO API DIRETAMENTE...');
+            log('='.repeat(50));
+            
+            try {
+                // Buscar letra A do banco
+                const gesturesResponse = await fetch('/api/get_gestures');
+                const gestures = await gesturesResponse.json();
+                
+                if (!gestures.A) {
+                    log('❌ Letra A não encontrada no banco!');
+                    return;
+                }
+                
+                log('✅ Letra A encontrada no banco');
+                
+                // Testar API de reconhecimento com landmarks da letra A
+                const recognizeResponse = await fetch('/api/recognize_gesture', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ landmarks: gestures.A.landmarks })
+                });
+                
+                if (recognizeResponse.ok) {
+                    const result = await recognizeResponse.json();
+                    log(`📡 API Response: ${JSON.stringify(result)}`);
+                    
+                    if (result.success && result.result) {
+                        log(`✅ API reconheceu: ${result.result.letter} (${(result.result.confidence * 100).toFixed(1)}%)`);
+                    } else {
+                        log(`❌ API falhou: ${result.error || 'Não reconhecido'}`);
+                    }
+                } else {
+                    log(`❌ API retornou erro HTTP: ${recognizeResponse.status}`);
+                }
+                
+            } catch (error) {
+                log(`❌ Erro no teste: ${error.message}`);
+            }
+        }
+        
+        async function testRecognizerIsolated() {
+            log('\n🤖 TESTANDO RECONHECEDOR ISOLADO...');
+            log('='.repeat(50));
+            
+            try {
+                // Criar nova instância limpa
+                recognizer = new CustomGestureRecognizer();
+                await new Promise(resolve => setTimeout(resolve, 3000)); // Aguardar carregamento
+                
+                // Verificar estado
+                const stats = recognizer.getRecognitionStats();
+                log(`📊 Stats do reconhecedor:`);
+                log(`   - Gestos carregados: ${stats.gesturesLoaded}`);
+                log(`   - Total gestos: ${stats.totalGestures}`);
+                log(`   - Letras: ${stats.availableLetters.join(', ')}`);
+                log(`   - Threshold: ${stats.confidenceThreshold * 100}%`);
+                
+                if (stats.availableLetters.length === 1 && stats.availableLetters[0] === 'A') {
+                    log('✅ Reconhecedor tem APENAS a letra A - isso está correto!');
+                } else {
+                    log('❌ Reconhecedor tem letras extras que não deveriam existir!');
+                }
+                
+                // Testar com landmarks fake para ver se gera letras falsas
+                const fakeLandmarks = Array.from({length: 21}, (_, i) => ({
+                    x: Math.random(),
+                    y: Math.random(), 
+                    z: Math.random() * 0.1
+                }));
+                
+                log('\n🎲 Testando com landmarks aleatórios...');
+                const fakeResult = await recognizer.recognizeLetter(fakeLandmarks);
+                
+                if (fakeResult) {
+                    log(`⚠️ PROBLEMA: Landmarks aleatórios geraram: ${fakeResult.letter}`);
+                    log(`   - Isso não deveria acontecer se só temos letra A!`);
+                } else {
+                    log('✅ Landmarks aleatórios não geraram nada - isso está correto!');
+                }
+                
+            } catch (error) {
+                log(`❌ Erro: ${error.message}`);
+            }
+        }
+        
+        async function interceptAllRecognition() {
+            log('\n🕵️ INTERCEPTANDO TODO RECONHECIMENTO...');
+            log('='.repeat(50));
+            
+            // Interceptar fetch para capturar todas as chamadas de API
+            const originalFetch = window.fetch;
+            
+            window.fetch = function(url, options) {
+                if (url.includes('/api/recognize_gesture')) {
+                    log(`🌐 INTERCEPTED API CALL: ${url}`);
+                    if (options && options.body) {
+                        try {
+                            const body = JSON.parse(options.body);
+                            log(`📤 Enviando landmarks: ${body.landmarks ? body.landmarks.length : 'N/A'} pontos`);
+                        } catch (e) {
+                            log(`📤 Body: ${options.body.substring(0, 100)}...`);
+                        }
+                    }
+                }
+                
+                return originalFetch.apply(this, arguments).then(response => {
+                    if (url.includes('/api/recognize_gesture')) {
+                        return response.clone().json().then(data => {
+                            log(`📥 API Response: ${JSON.stringify(data)}`);
+                            return new Response(JSON.stringify(data), {
+                                status: response.status,
+                                statusText: response.statusText,
+                                headers: response.headers
+                            });
+                        });
+                    }
+                    return response;
+                });
+            };
+            
+            log('✅ Interceptor instalado - agora todas as chamadas serão logadas');
+            log('💡 Faça a letra A e veja o que aparece nos logs!');
+        }
+        
+        async function monitorAPITraffic() {
+            log('\n📊 MONITORANDO TRÁFEGO DA API...');
+            log('='.repeat(50));
+            
+            // Verificar se há múltiplas chamadas simultâneas
+            let apiCallCount = 0;
+            let lastCallTime = 0;
+            
+            const originalFetch = window.fetch;
+            
+            window.fetch = function(url, options) {
+                if (url.includes('/api/recognize_gesture')) {
+                    apiCallCount++;
+                    const now = Date.now();
+                    const timeSinceLastCall = now - lastCallTime;
+                    lastCallTime = now;
+                    
+                    log(`📞 API Call #${apiCallCount} (${timeSinceLastCall}ms since last)`);
+                    
+                    if (timeSinceLastCall < 100) {
+                        log(`⚠️ CHAMADAS MUITO RÁPIDAS! Pode haver múltiplos reconhecedores!`);
+                    }
+                }
+                
+                return originalFetch.apply(this, arguments);
+            };
+            
+            log('✅ Monitor de tráfego ativo');
+        }
+        
+        async function trackLetterSources() {
+            log('\n🔎 RASTREANDO FONTE DAS LETRAS...');
+            log('='.repeat(50));
+            
+            // Interceptar console.log para capturar outputs de reconhecimento
+            const originalLog = console.log;
+            
+            console.log = function(...args) {
+                const message = args.join(' ');
+                
+                // Buscar por mensagens de reconhecimento
+                if (message.includes('Recognition response:') || 
+                    message.includes('Letra reconhecida:') ||
+                    message.includes('letter:')) {
+                    
+                    log(`🎯 CONSOLE INTERCEPTADO: ${message}`);
+                    
+                    // Mostrar stack trace para ver de onde vem
+                    const stack = new Error().stack;
+                    const lines = stack.split('\n').slice(2, 5); // Pegar algumas linhas do stack
+                    for (const line of lines) {
+                        if (line.trim()) {
+                            log(`   📍 ${line.trim()}`);
+                        }
+                    }
+                }
+                
+                return originalLog.apply(this, arguments);
+            };
+            
+            log('✅ Interceptor de console ativo - agora vamos rastrear de onde vêm as letras!');
+        }
+        
+        async function disableAllFallbacks() {
+            log('\n🚫 DESABILITANDO TODOS OS FALLBACKS...');
+            log('='.repeat(50));
+            
+            try {
+                // Modificar o reconhecedor para ser mais restritivo
+                if (recognizer || window.recognizer) {
+                    const r = recognizer || window.recognizer;
+                    
+                    // Desabilitar fallback se existir
+                    if (r.fallbackRecognition) {
+                        r.fallbackRecognition = function() {
+                            log('🚫 FALLBACK BLOQUEADO!');
+                            return null;
+                        };
+                    }
+                    
+                    // Modificar threshold para ser mais restritivo
+                    r.confidenceThreshold = 0.95; // 95% - muito rigoroso
+                    
+                    log('✅ Fallbacks desabilitados e threshold aumentado para 95%');
+                } else {
+                    log('❌ Não foi possível encontrar instância do reconhecedor');
+                }
+                
+            } catch (error) {
+                log(`❌ Erro: ${error.message}`);
+            }
+        }
+        
+        async function forceOnlyDatabase() {
+            log('\n🗃️ FORÇANDO APENAS BANCO DE DADOS...');
+            log('='.repeat(50));
+            
+            // Verificar se só temos letra A
+            try {
+                const response = await fetch('/api/get_gestures');
+                const gestures = await response.json();
+                
+                log(`📋 Letras no banco: ${Object.keys(gestures).join(', ')}`);
+                
+                if (Object.keys(gestures).length === 1 && gestures.A) {
+                    log('✅ Banco contém APENAS letra A - isso está correto!');
+                    
+                    // Agora vamos forçar reconhecimento apenas se for muito similar à letra A
+                    log('🔧 Implementando reconhecimento super-restritivo...');
+                    
+                    // Substituir função de reconhecimento
+                    if (recognizer) {
+                        const originalRecognize = recognizer.recognizeLetter;
+                        
+                        recognizer.recognizeLetter = async function(landmarks) {
+                            log('🧪 Reconhecimento super-restritivo ativo...');
+                            
+                            // Chamar API apenas
+                            try {
+                                const response = await fetch('/api/recognize_gesture', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ landmarks: landmarks })
+                                });
+                                
+                                if (response.ok) {
+                                    const result = await response.json();
+                                    
+                                    if (result.success && result.result && result.result.letter === 'A') {
+                                        log(`✅ API reconheceu letra A com ${(result.result.confidence * 100).toFixed(1)}%`);
+                                        return result.result;
+                                    } else {
+                                        log('❌ API não reconheceu letra A');
+                                        return null;
+                                    }
+                                } else {
+                                    log('❌ API retornou erro');
+                                    return null;
+                                }
+                                
+                            } catch (error) {
+                                log(`❌ Erro na API: ${error.message}`);
+                                return null;
+                            }
+                        };
+                        
+                        log('✅ Reconhecimento substituído - agora APENAS A via API!');
+                    }
+                    
+                } else {
+                    log(`❌ Banco tem letras extras: ${Object.keys(gestures).join(', ')}`);
+                    log('💡 Vá em /admin e remova todas exceto A!');
+                }
+                
+            } catch (error) {
+                log(`❌ Erro: ${error.message}`);
+            }
+        }
+        
+        async function testWithCleanSetup() {
+            log('\n🧹 TESTE COM SETUP LIMPO...');
+            log('='.repeat(50));
+            
+            // Limpar tudo e recomeçar
+            window.recognizer = null;
+            recognizer = null;
+            
+            log('🗑️ Limpando instâncias antigas...');
+            
+            // Criar nova instância
+            try {
+                recognizer = new CustomGestureRecognizer();
+                log('✅ Nova instância criada');
+                
+                // Aguardar carregamento
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                
+                const stats = recognizer.getRecognitionStats();
+                log(`📊 Nova instância - Letras: ${stats.availableLetters.join(', ')}`);
+                
+                if (stats.availableLetters.length === 1 && stats.availableLetters[0] === 'A') {
+                    log('✅ Setup limpo: APENAS letra A disponível!');
+                    log('💡 Agora teste fazer a letra A na página do jogo');
+                } else {
+                    log('❌ Ainda há problema - letras extras detectadas');
+                }
+                
+            } catch (error) {
+                log(`❌ Erro: ${error.message}`);
+            }
+        }
+    </script>
+</body>
+</html>

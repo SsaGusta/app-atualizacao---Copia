@@ -10,8 +10,8 @@
                 <i class="fas fa-chart-line text-primary"></i>
                 Minhas Estatísticas
             </h2>
-            <a href="{{ url_for('game') }}" class="btn btn-primary">
-                <i class="fas fa-play"></i> Voltar ao Jogo
+            <a href="{{ url_for('mediapipe') }}" class="btn btn-primary">
+                <i class="fas fa-hands"></i> Voltar ao MediaPipe
             </a>
         </div>
     </div>
@@ -111,9 +111,9 @@
                 <div class="text-center py-4">
                     <i class="fas fa-chart-line fa-3x text-muted mb-3"></i>
                     <h5 class="text-muted">Nenhuma sessão encontrada</h5>
-                    <p class="text-muted">Comece a jogar para ver suas estatísticas aqui!</p>
-                    <a href="{{ url_for('game') }}" class="btn btn-primary">
-                        <i class="fas fa-play"></i> Começar a Jogar
+                    <p class="text-muted">Use o sistema de reconhecimento para gerar estatísticas!</p>
+                    <a href="{{ url_for('mediapipe') }}" class="btn btn-primary">
+                        <i class="fas fa-hands"></i> Começar Reconhecimento
                     </a>
                 </div>
                 {% endif %}
@@ -148,13 +148,155 @@
                 {% else %}
                 <div class="text-center py-3">
                     <i class="fas fa-hand-paper fa-2x text-muted mb-2"></i>
-                    <p class="text-muted mb-0">Dados de letras aparecerão após jogar</p>
+                    <p class="text-muted mb-0">Dados de letras aparecerão após usar o reconhecimento</p>
                 </div>
                 {% endif %}
             </div>
         </div>
     </div>
 </div>
+
+<!-- Estatísticas do Soletrando -->
+{% if soletrando_stats and not soletrando_stats.get('error') and not soletrando_stats.get('info') %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-spell-check"></i> Estatísticas do Jogo Soletrando
+                </h5>
+            </div>
+            <div class="card-body">
+                <!-- Summary Cards do Soletrando -->
+                <div class="row mb-4">
+                    <div class="col-lg-3 col-md-6 mb-3">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <i class="fas fa-font fa-2x text-success mb-2"></i>
+                                <div class="h4">{{ soletrando_stats.general.total_letters }}</div>
+                                <small class="text-muted">Letras Completadas</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6 mb-3">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <i class="fas fa-book fa-2x text-primary mb-2"></i>
+                                <div class="h4">{{ soletrando_stats.general.total_words }}</div>
+                                <small class="text-muted">Palavras Soletradas</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6 mb-3">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <i class="fas fa-clock fa-2x text-warning mb-2"></i>
+                                <div class="h4">{{ soletrando_stats.general.avg_time }}s</div>
+                                <small class="text-muted">Tempo Médio/Letra</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6 mb-3">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <i class="fas fa-bullseye fa-2x text-info mb-2"></i>
+                                <div class="h4">{{ soletrando_stats.general.avg_similarity }}%</div>
+                                <small class="text-muted">Precisão Média</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- Performance por Letra no Soletrando -->
+                    <div class="col-lg-6 mb-4">
+                        <h6><i class="fas fa-chart-bar"></i> Performance por Letra</h6>
+                        {% if soletrando_stats.letter_stats %}
+                        <div style="max-height: 300px; overflow-y: auto;">
+                            {% for letter_stat in soletrando_stats.letter_stats %}
+                            <div class="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
+                                <div class="d-flex align-items-center">
+                                    <span class="badge bg-success me-2 fs-6">{{ letter_stat[0] }}</span>
+                                    <small class="text-muted">{{ letter_stat[1] }} tentativas</small>
+                                </div>
+                                <div class="text-end">
+                                    <div class="fw-bold">{{ "%.1f"|format(letter_stat[2]) }}s</div>
+                                    <small class="text-success">Melhor: {{ "%.1f"|format(letter_stat[3]) }}s</small>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="text-center py-3 text-muted">
+                            <i class="fas fa-spell-check fa-2x mb-2"></i>
+                            <p class="mb-0">Comece a jogar Soletrando para ver suas estatísticas!</p>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Palavras Recentes -->
+                    <div class="col-lg-6 mb-4">
+                        <h6><i class="fas fa-history"></i> Palavras Recentes</h6>
+                        {% if soletrando_stats.recent_words %}
+                        <div style="max-height: 300px; overflow-y: auto;">
+                            {% for word_stat in soletrando_stats.recent_words %}
+                            <div class="card mb-2">
+                                <div class="card-body py-2">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <span class="fw-bold">{{ word_stat[0] }}</span>
+                                            <small class="text-muted d-block">{{ word_stat[1] }} letras</small>
+                                        </div>
+                                        <div class="text-end">
+                                            <div class="small">{{ "%.1f"|format(word_stat[2]) }}s total</div>
+                                            <small class="text-muted">{{ word_stat[5][:10] }}</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="text-center py-3 text-muted">
+                            <i class="fas fa-book fa-2x mb-2"></i>
+                            <p class="mb-0">Suas palavras completadas aparecerão aqui!</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Progresso Semanal -->
+                {% if soletrando_stats.daily_progress %}
+                <div class="row">
+                    <div class="col-12">
+                        <h6><i class="fas fa-calendar-week"></i> Progresso dos Últimos 7 Dias</h6>
+                        <div class="row">
+                            {% for day_stat in soletrando_stats.daily_progress %}
+                            <div class="col">
+                                <div class="card text-center mb-2">
+                                    <div class="card-body py-2">
+                                        <div class="small fw-bold">{{ day_stat[0][5:] }}</div>
+                                        <div class="h6 text-success">{{ day_stat[1] }}</div>
+                                        <small class="text-muted">letras</small>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="text-center mt-3">
+                    <a href="{{ url_for('soletrando') }}" class="btn btn-success">
+                        <i class="fas fa-play"></i> Jogar Soletrando
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <!-- Progress Charts -->
 <div class="row">

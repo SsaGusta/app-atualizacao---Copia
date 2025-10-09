@@ -14,12 +14,19 @@ class HandTracker {
         this.fpsCounter = 0;
         this.lastTime = performance.now();
         
+        // Sistema de reconhecimento de gestos
+        this.savedGestures = {};
+        this.lastRecognitionTime = 0;
+        this.recognitionDelay = 500; // Reconhecer a cada 500ms para evitar spam
+        this.lastDetailedAnalysis = null; // Armazenar análise detalhada
+        
         // Configurar canvas
         this.canvasElement.width = 640;
         this.canvasElement.height = 480;
         
         this.initializeMediaPipe();
         this.setupEventListeners();
+        this.loadSavedGestures();
     }
     
     initializeMediaPipe() {
@@ -59,6 +66,31 @@ class HandTracker {
         window.addEventListener('beforeunload', () => {
             this.stopCamera();
         });
+    }
+    
+    async loadSavedGestures() {
+        try {
+            console.log('📥 Carregando gestos salvos...');
+            const response = await fetch('/api/get_gestures');
+            
+            if (response.ok) {
+                this.savedGestures = await response.json();
+                const gestureCount = Object.keys(this.savedGestures).length;
+                console.log('✅ Gestos carregados:', gestureCount, 'letras disponíveis');
+                
+                if (gestureCount > 0) {
+                    console.log('📚 Letras disponíveis:', Object.keys(this.savedGestures).join(', '));
+                } else {
+                    console.log('⚠️ Nenhum gesto salvo encontrado. Vá para /admin para capturar gestos.');
+                }
+            } else {
+                console.warn('⚠️ Não foi possível carregar gestos salvos');
+                this.savedGestures = {};
+            }
+        } catch (error) {
+            console.error('❌ Erro ao carregar gestos:', error);
+            this.savedGestures = {};
+        }
     }
     
     async startCamera() {
@@ -153,7 +185,6 @@ class HandTracker {
         this.updateStatus('Câmera parada');
         this.updateHandCount(0);
         this.updateHandLandmarks([]);
-        this.updateDetectionConfidence('-');
         this.updateFPS('-');
     }
     
@@ -164,63 +195,41 @@ class HandTracker {
         this.canvasCtx.save();
         this.canvasCtx.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height);
         
-        // Desenhar imagem da câmera (espelhada)
-        this.canvasCtx.scale(-1, 1);
-        this.canvasCtx.drawImage(results.image, -this.canvasElement.width, 0, this.canvasElement.width, this.canvasElement.height);
-        this.canvasCtx.scale(-1, 1);
+        // Desenhar imagem da câmera (sem espelhamento)
+        this.canvasCtx.drawImage(results.image, 0, 0, this.canvasElement.width, this.canvasElement.height);
         
         // Processar mãos detectadas
         if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
             this.updateHandCount(results.multiHandLandmarks.length);
             
-            let totalConfidence = 0;
-            
             for (let i = 0; i < results.multiHandLandmarks.length; i++) {
                 const landmarks = results.multiHandLandmarks[i];
                 
-                // Espelhar landmarks horizontalmente
-                const mirroredLandmarks = landmarks.map(landmark => ({
-                    x: 1 - landmark.x,
-                    y: landmark.y,
-                    z: landmark.z
-                }));
-                
                 // Desenhar conexões
-                drawConnectors(this.canvasCtx, mirroredLandmarks, HAND_CONNECTIONS, {
+                drawConnectors(this.canvasCtx, landmarks, HAND_CONNECTIONS, {
                     color: '#00FF00',
                     lineWidth: 3
                 });
                 
-                // Desenhar pontos
-                drawLandmarks(this.canvasCtx, mirroredLandmarks, {
-                    color: '#FF0000',
-                    lineWidth: 2,
-                    radius: 4
-                });
+                // Desenhar pontos com cores baseadas na análise (se disponível)
+                this.drawLandmarksWithAnalysis(landmarks, this.lastDetailedAnalysis);
                 
-                // Calcular confiança (simulada baseada na estabilidade dos pontos)
-                const confidence = this.calculateHandConfidence(landmarks);
-                totalConfidence += confidence;
+                // Reconhecer letra (apenas para a primeira mão, com throttling)
+                if (i === 0) {
+                    this.recognizeGesture(landmarks);
+                }
             }
             
-            const avgConfidence = (totalConfidence / results.multiHandLandmarks.length * 100).toFixed(1);
-            this.updateDetectionConfidence(`${avgConfidence}%`);
             this.updateHandLandmarks(results.multiHandLandmarks);
             
         } else {
             this.updateHandCount(0);
             this.updateHandLandmarks([]);
-            this.updateDetectionConfidence('-');
+            this.updateDetectedLetter('-');
         }
         
         this.canvasCtx.restore();
         this.updateFPSCounter();
-    }
-    
-    calculateHandConfidence(landmarks) {
-        // Simular confiança baseada na variabilidade dos pontos
-        // Em uma implementação real, isso viria do modelo MediaPipe
-        return Math.random() * 0.3 + 0.7; // Entre 70% e 100%
     }
     
     startFPSCounter() {
@@ -254,14 +263,7 @@ class HandTracker {
             handCountElement.innerHTML = `<strong>Mãos detectadas:</strong> ${count}`;
         }
     }
-    
-    updateDetectionConfidence(confidence) {
-        const confidenceElement = document.getElementById('detection_confidence');
-        if (confidenceElement) {
-            confidenceElement.innerHTML = `<strong>Confiança:</strong> ${confidence}`;
-        }
-    }
-    
+
     updateFPS(fps) {
         const fpsElement = document.getElementById('fps_counter');
         if (fpsElement) {
@@ -269,6 +271,218 @@ class HandTracker {
         }
     }
     
+    async recognizeGesture(landmarks) {
+        // Throttling para evitar muitas requisições
+        const currentTime = Date.now();
+        if (currentTime - this.lastRecognitionTime < this.recognitionDelay) {
+            return;
+        }
+        
+        this.lastRecognitionTime = currentTime;
+        
+        try {
+            // Verificar se temos gestos salvos
+            if (Object.keys(this.savedGestures).length === 0) {
+                // console.log('⚠️ Nenhum gesto salvo disponível para reconhecimento');
+                return;
+            }
+            
+            const response = await fetch('/api/recognize_gesture', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    landmarks: landmarks
+                })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.result) {
+                    const result = data.result;
+                    
+                    // Log detalhado do reconhecimento
+                    console.log('🎯 Reconhecimento detalhado:');
+                    console.log(`📝 Letra: ${result.letter}`);
+                    console.log(`📊 Similaridade: ${(result.similarity * 100).toFixed(1)}%`);
+                    
+                    // Se houver análise detalhada, mostrar estatísticas
+                    if (result.detailed_analysis && result.detailed_analysis.statistics) {
+                        const stats = result.detailed_analysis.statistics;
+                        console.log('📈 Análise dos pontos:');
+                        console.log(`  ✅ Excelentes: ${stats.excellent_points}/21`);
+                        console.log(`  ✔️ Bons: ${stats.good_points}/21`);
+                        console.log(`  ⚠️ Aceitáveis: ${stats.acceptable_points}/21`);
+                        console.log(`  ❌ Ruins: ${stats.bad_points}/21`);
+                        console.log(`  🎯 Taxa de match: ${stats.match_percentage.toFixed(1)}%`);
+                        
+                        // Mostrar pontos problemáticos
+                        if (result.detailed_analysis.point_analysis) {
+                            const badPoints = result.detailed_analysis.point_analysis
+                                .filter(p => p.quality === 'ruim')
+                                .map(p => p.point_id);
+                            
+                            if (badPoints.length > 0) {
+                                console.log(`⚠️ Pontos com problemas: ${badPoints.join(', ')}`);
+                            }
+                        }
+                    }
+                    
+                    this.updateDetectedLetter(result.letter, result);
+                    
+                    // Armazenar análise detalhada para visualização
+                    this.lastDetailedAnalysis = result.detailed_analysis;
+                } else {
+                    this.updateDetectedLetter('-');
+                }
+            } else {
+                console.error('❌ Erro na API de reconhecimento:', response.status);
+            }
+        } catch (error) {
+            console.error('❌ Erro no reconhecimento:', error);
+        }
+    }
+    
+    updateDetectedLetter(letter, detailedResult = null) {
+        const letterElement = document.getElementById('detectedLetter');
+        const detailsElement = document.getElementById('recognitionDetails');
+        const analysisElement = document.getElementById('analysisInfo');
+        const legendElement = document.getElementById('pointLegend');
+        
+        if (letterElement) {
+            letterElement.textContent = letter;
+            
+            if (letter !== '-') {
+                letterElement.style.color = '#28a745';
+                letterElement.style.fontWeight = 'bold';
+                letterElement.style.fontSize = '1.5em';
+                
+                // Efeito visual de reconhecimento
+                letterElement.style.transform = 'scale(1.1)';
+                setTimeout(() => {
+                    letterElement.style.transform = 'scale(1.0)';
+                }, 200);
+                
+                // Mostrar informações detalhadas
+                if (detailedResult && detailedResult.detailed_analysis) {
+                    const stats = detailedResult.detailed_analysis.statistics;
+                    
+                    // Tooltip detalhado
+                    letterElement.title = `Similaridade: ${(detailedResult.similarity * 100).toFixed(1)}%\n` +
+                                         `Pontos excelentes: ${stats.excellent_points}/21\n` +
+                                         `Pontos bons: ${stats.good_points}/21\n` +
+                                         `Taxa de match: ${stats.match_percentage.toFixed(1)}%`;
+                    
+                    // Informações na interface
+                    if (analysisElement && detailsElement) {
+                        analysisElement.innerHTML = `Similaridade: ${(detailedResult.similarity * 100).toFixed(1)}% | ` +
+                                                   `Match: ${stats.match_percentage.toFixed(1)}% | ` +
+                                                   `Pontos OK: ${stats.excellent_points + stats.good_points}/21`;
+                        detailsElement.style.display = 'block';
+                    }
+                    
+                    // Mostrar legenda quando há análise detalhada
+                    if (legendElement) {
+                        legendElement.style.display = 'block';
+                    }
+                } else {
+                    letterElement.title = `Similaridade: ${detailedResult ? (detailedResult.similarity * 100).toFixed(1) + '%' : 'N/A'}`;
+                    
+                    if (analysisElement && detailsElement) {
+                        analysisElement.textContent = detailedResult ? 
+                            `Similaridade: ${(detailedResult.similarity * 100).toFixed(1)}%` : 
+                            'Análise básica';
+                        detailsElement.style.display = 'block';
+                    }
+                    
+                    // Esconder legenda para análise básica
+                    if (legendElement) {
+                        legendElement.style.display = 'none';
+                    }
+                }
+                
+                console.log('✅ Letra reconhecida:', letter);
+            } else {
+                letterElement.style.color = '#6c757d';
+                letterElement.style.fontWeight = 'normal';
+                letterElement.style.fontSize = '1.2em';
+                letterElement.title = 'Nenhuma letra detectada';
+                
+                // Esconder detalhes e legenda
+                if (detailsElement) {
+                    detailsElement.style.display = 'none';
+                }
+                if (legendElement) {
+                    legendElement.style.display = 'none';
+                }
+            }
+        }
+    }
+    
+    drawLandmarksWithAnalysis(landmarks, detailedAnalysis) {
+        if (!landmarks) return;
+        
+        // Se não há análise detalhada, desenhar normalmente
+        if (!detailedAnalysis || !detailedAnalysis.point_analysis) {
+            drawLandmarks(this.canvasCtx, landmarks, {
+                color: '#FF0000',
+                lineWidth: 2,
+                radius: 4
+            });
+            return;
+        }
+        
+        // Desenhar cada ponto com cor baseada na qualidade
+        const pointAnalysis = detailedAnalysis.point_analysis;
+        
+        landmarks.forEach((landmark, index) => {
+            const analysis = pointAnalysis.find(p => p.point_id === index);
+            let color = '#FF0000'; // Padrão vermelho
+            let radius = 4;
+            
+            if (analysis) {
+                switch (analysis.quality) {
+                    case 'excelente':
+                        color = '#00FF00'; // Verde
+                        radius = 5;
+                        break;
+                    case 'bom':
+                        color = '#90EE90'; // Verde claro
+                        radius = 4;
+                        break;
+                    case 'aceitável':
+                        color = '#FFA500'; // Laranja
+                        radius = 4;
+                        break;
+                    case 'ruim':
+                        color = '#FF4444'; // Vermelho forte
+                        radius = 6;
+                        break;
+                }
+            }
+            
+            // Desenhar o ponto
+            this.canvasCtx.fillStyle = color;
+            this.canvasCtx.beginPath();
+            this.canvasCtx.arc(
+                landmark.x * this.canvasElement.width,
+                landmark.y * this.canvasElement.height,
+                radius,
+                0,
+                2 * Math.PI
+            );
+            this.canvasCtx.fill();
+            
+            // Adicionar contorno para pontos ruins
+            if (analysis && analysis.quality === 'ruim') {
+                this.canvasCtx.strokeStyle = '#FFFFFF';
+                this.canvasCtx.lineWidth = 2;
+                this.canvasCtx.stroke();
+            }
+        });
+    }
+
     updateHandLandmarks(handsData) {
         const container = document.getElementById('hand_landmarks');
         if (!container) return;

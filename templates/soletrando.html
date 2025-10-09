@@ -1,0 +1,673 @@
+{% extends "base.html" %}
+
+{% block title %}Jogo Soletrando - LIBRAS{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-12 mx-auto">
+        <!-- Header -->
+        <div class="text-center mb-4">
+            <h1 class="text-primary">
+                <i class="fas fa-spell-check"></i> Jogo Soletrando
+            </h1>
+            <p class="lead">Digite uma palavra e soletre usando gestos LIBRAS</p>
+        </div>
+
+        <!-- Game Setup -->
+        <div class="card shadow-sm mb-4" id="gameSetup">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-keyboard"></i> Configuração do Jogo</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <label for="wordInput" class="form-label">Digite a palavra para soletrar:</label>
+                        <input type="text" class="form-control" id="wordInput" placeholder="Ex: CASA, AMOR, VIDA..." maxlength="15">
+                        <small class="form-text text-muted">Apenas letras de A-Z (máximo 15 caracteres)</small>
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button class="btn btn-primary w-100" id="startGameBtn">
+                            <i class="fas fa-play"></i> Iniciar Jogo
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Area -->
+        <div id="gameArea" style="display: none;">
+            <!-- Word Display -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-font"></i> Palavra: <span id="currentWord">-</span></h5>
+                    <div>
+                        <button class="btn btn-info btn-sm me-2" id="helpBtn">
+                            <i class="fas fa-question-circle"></i> Ajuda
+                        </button>
+                        <button class="btn btn-secondary btn-sm" id="resetGameBtn">
+                            <i class="fas fa-redo"></i> Nova Palavra
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="text-center">
+                        <div id="wordLetters" class="word-display">
+                            <!-- Letras serão inseridas aqui -->
+                        </div>
+                        <div class="mt-3">
+                            <p class="mb-1"><strong>Progresso:</strong> <span id="progressText">0/0 letras</span></p>
+                            <div class="progress" style="height: 10px;">
+                                <div class="progress-bar" id="progressBar" role="progressbar" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <p class="mb-1"><strong>Letra atual:</strong> 
+                                <span id="currentLetter" class="badge bg-primary fs-6">-</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Camera Area -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-camera"></i> Reconhecimento de Gestos</h5>
+                </div>
+                <div class="card-body text-center">
+                    <div class="video-container position-relative d-inline-block">
+                        <video id="input_video" style="display: none;" playsinline></video>
+                        <canvas id="output_canvas" class="border rounded" style="max-width: 100%; height: auto;"></canvas>
+                    </div>
+                    <!-- Camera Controls -->
+                    <div class="mt-3">
+                        <button id="start_camera_btn" class="btn btn-success btn-lg me-2">
+                            <i class="fas fa-video"></i> Iniciar Câmera
+                        </button>
+                        <button id="stop_camera_btn" class="btn btn-danger btn-lg" disabled>
+                            <i class="fas fa-video-slash"></i> Parar Câmera
+                        </button>
+                    </div>
+                    <!-- Status -->
+                    <div class="mt-3">
+                        <div class="alert alert-info" role="alert">
+                            <strong>Status:</strong> <span id="cameraStatus">Câmera desligada</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recognition Info -->
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> Informações do Reconhecimento</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div><strong>Letra Detectada:</strong> 
+                                <span id="detectedLetter" class="fs-5 text-success">-</span>
+                            </div>
+                            <div class="mt-2" id="recognitionDetails" style="display: none;">
+                                <small class="text-muted">
+                                    <strong>Análise:</strong> <span id="analysisInfo">-</span>
+                                </small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div><strong>Mãos detectadas:</strong> <span id="handCount">0</span></div>
+                            <div><strong>FPS:</strong> <span id="fpsCounter">-</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Success Modal -->
+        <div class="modal fade" id="successModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header bg-success text-white">
+                        <h5 class="modal-title">
+                            <i class="fas fa-trophy"></i> Parabéns!
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body text-center">
+                        <div class="mb-3">
+                            <i class="fas fa-star text-warning" style="font-size: 3rem;"></i>
+                        </div>
+                        <h4>Palavra Completada!</h4>
+                        <p class="mb-0">Você soletrou com sucesso a palavra: <strong id="completedWord">-</strong></p>
+                    </div>
+                    <div class="modal-footer justify-content-center">
+                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal" id="playAgainBtn">
+                            <i class="fas fa-play"></i> Jogar Novamente
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Help Modal -->
+        <div class="modal fade" id="helpModal" tabindex="-1">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header bg-info text-white">
+                        <h5 class="modal-title">
+                            <i class="fas fa-question-circle"></i> Ajuda - Como fazer a letra <span id="helpLetter">-</span>
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body text-center">
+                        <div id="helpVideoContainer">
+                            <video id="helpVideo" controls style="max-width: 100%; height: auto;" preload="metadata">
+                                <source src="" type="video/mp4">
+                                Seu navegador não suporta vídeos.
+                            </video>
+                        </div>
+                        <div class="mt-3">
+                            <p class="text-muted">Assista ao vídeo para aprender como fazer o gesto da letra <strong id="helpLetterText">-</strong></p>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="fas fa-times"></i> Fechar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-lightbulb"></i> Como Jogar</h5>
+            </div>
+            <div class="card-body">
+                <ol>
+                    <li><strong>Digite uma palavra</strong> no campo acima e clique em "Iniciar Jogo"</li>
+                    <li><strong>Ligue a câmera</strong> clicando em "Iniciar Câmera"</li>
+                    <li><strong>Faça os gestos</strong> das letras em LIBRAS na ordem da palavra</li>
+                    <li><strong>Letras corretas</strong> ficam verdes automaticamente</li>
+                    <li><strong>Use a ajuda</strong> se precisar ver como fazer alguma letra</li>
+                    <li><strong>Complete a palavra</strong> para ganhar!</li>
+                </ol>
+                <div class="alert alert-info mt-3">
+                    <i class="fas fa-info-circle"></i> 
+                    <strong>Dica:</strong> Posicione bem sua mão na frente da câmera e aguarde o reconhecimento automático.
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="text-center mt-4">
+            <a href="{{ url_for('index') }}" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left"></i> Voltar ao Menu
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+.word-display {
+    font-size: 2.5rem;
+    font-weight: bold;
+    letter-spacing: 0.3rem;
+    margin: 1rem 0;
+}
+
+.letter-box {
+    display: inline-block;
+    width: 60px;
+    height: 80px;
+    line-height: 80px;
+    margin: 0 5px;
+    text-align: center;
+    border: 3px solid #dee2e6;
+    border-radius: 10px;
+    background: #f8f9fa;
+    color: #6c757d;
+    transition: all 0.3s ease;
+}
+
+.letter-box.current {
+    border-color: #007bff;
+    background: #e3f2fd;
+    color: #007bff;
+    animation: pulse 2s infinite;
+}
+
+.letter-box.correct {
+    border-color: #28a745;
+    background: #d4edda;
+    color: #155724;
+    animation: correctFlash 0.6s ease;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+@keyframes correctFlash {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); background: #28a745; color: white; }
+    100% { transform: scale(1); }
+}
+
+.video-container {
+    max-width: 640px;
+    margin: 0 auto;
+}
+
+#output_canvas {
+    max-width: 100%;
+    height: auto;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<!-- MediaPipe Dependencies -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+<!-- Custom Scripts -->
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="{{ url_for('static', filename='js/mediapipe-hands.js') }}"></script>
+
+<script>
+class SoletrandoGame {
+    constructor() {
+        this.word = '';
+        this.currentIndex = 0;
+        this.handTracker = null;
+        this.gameActive = false;
+        
+        // Tracking de tempo
+        this.letterStartTime = null;
+        this.gameStartTime = null;
+        this.letterTimes = [];
+        
+        this.initializeElements();
+        this.bindEvents();
+    }
+    
+    initializeElements() {
+        // Game setup elements
+        this.wordInput = document.getElementById('wordInput');
+        this.startGameBtn = document.getElementById('startGameBtn');
+        this.gameSetup = document.getElementById('gameSetup');
+        this.gameArea = document.getElementById('gameArea');
+        
+        // Game display elements
+        this.currentWordSpan = document.getElementById('currentWord');
+        this.wordLettersContainer = document.getElementById('wordLetters');
+        this.progressText = document.getElementById('progressText');
+        this.progressBar = document.getElementById('progressBar');
+        this.currentLetterSpan = document.getElementById('currentLetter');
+        
+        // Camera elements
+        this.startCameraBtn = document.getElementById('start_camera_btn');
+        this.stopCameraBtn = document.getElementById('stop_camera_btn');
+        this.cameraStatus = document.getElementById('cameraStatus');
+        
+        // Recognition elements
+        this.detectedLetter = document.getElementById('detectedLetter');
+        this.recognitionDetails = document.getElementById('recognitionDetails');
+        this.analysisInfo = document.getElementById('analysisInfo');
+        this.handCount = document.getElementById('handCount');
+        this.fpsCounter = document.getElementById('fpsCounter');
+        
+        // Modals
+        this.successModal = new bootstrap.Modal(document.getElementById('successModal'));
+        this.helpModal = new bootstrap.Modal(document.getElementById('helpModal'));
+        this.completedWordSpan = document.getElementById('completedWord');
+        
+        // Help elements
+        this.helpBtn = document.getElementById('helpBtn');
+        this.helpLetter = document.getElementById('helpLetter');
+        this.helpLetterText = document.getElementById('helpLetterText');
+        this.helpVideo = document.getElementById('helpVideo');
+        
+        // Reset button
+        this.resetGameBtn = document.getElementById('resetGameBtn');
+        this.playAgainBtn = document.getElementById('playAgainBtn');
+    }
+    
+    bindEvents() {
+        this.startGameBtn.addEventListener('click', () => this.startGame());
+        this.resetGameBtn.addEventListener('click', () => this.resetGame());
+        this.playAgainBtn.addEventListener('click', () => this.resetGame());
+        this.helpBtn.addEventListener('click', () => this.showHelp());
+        
+        this.wordInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                this.startGame();
+            }
+        });
+        
+        this.wordInput.addEventListener('input', (e) => {
+            // Apenas letras
+            e.target.value = e.target.value.toUpperCase().replace(/[^A-Z]/g, '');
+        });
+        
+        // Camera controls
+        this.startCameraBtn.addEventListener('click', () => this.startCamera());
+        this.stopCameraBtn.addEventListener('click', () => this.stopCamera());
+    }
+    
+    startGame() {
+        const word = this.wordInput.value.trim().toUpperCase();
+        
+        if (!word || word.length === 0) {
+            alert('Por favor, digite uma palavra!');
+            return;
+        }
+        
+        if (!/^[A-Z]+$/.test(word)) {
+            alert('Por favor, use apenas letras de A-Z!');
+            return;
+        }
+        
+        this.word = word;
+        this.currentIndex = 0;
+        this.gameActive = true;
+        
+        // Inicializar tracking de tempo
+        this.gameStartTime = new Date();
+        this.letterStartTime = new Date();
+        this.letterTimes = [];
+        
+        this.setupGameDisplay();
+        this.showGameArea();
+        
+        console.log(`Jogo iniciado: "${word}" - Tempo: ${this.gameStartTime.toISOString()}`);
+    }
+    
+    setupGameDisplay() {
+        this.currentWordSpan.textContent = this.word;
+        
+        // Criar boxes das letras
+        this.wordLettersContainer.innerHTML = '';
+        for (let i = 0; i < this.word.length; i++) {
+            const letterBox = document.createElement('div');
+            letterBox.className = 'letter-box';
+            letterBox.textContent = this.word[i];
+            letterBox.id = `letter-${i}`;
+            
+            if (i === 0) {
+                letterBox.classList.add('current');
+            }
+            
+            this.wordLettersContainer.appendChild(letterBox);
+        }
+        
+        this.updateProgress();
+        this.updateCurrentLetter();
+    }
+    
+    showGameArea() {
+        this.gameSetup.style.display = 'none';
+        this.gameArea.style.display = 'block';
+    }
+    
+    resetGame() {
+        this.gameActive = false;
+        this.word = '';
+        this.currentIndex = 0;
+        
+        // Limpar tracking de tempo
+        this.letterStartTime = null;
+        this.gameStartTime = null;
+        this.letterTimes = [];
+        
+        if (this.handTracker && this.handTracker.camera) {
+            this.stopCamera();
+        }
+        
+        this.gameSetup.style.display = 'block';
+        this.gameArea.style.display = 'none';
+        this.wordInput.value = '';
+        this.wordInput.focus();
+        
+        // Fechar modais
+        this.successModal.hide();
+        this.helpModal.hide();
+        
+        console.log('Jogo resetado');
+    }
+    
+    updateProgress() {
+        const progress = (this.currentIndex / this.word.length) * 100;
+        this.progressText.textContent = `${this.currentIndex}/${this.word.length} letras`;
+        this.progressBar.style.width = `${progress}%`;
+    }
+    
+    updateCurrentLetter() {
+        if (this.currentIndex < this.word.length) {
+            this.currentLetterSpan.textContent = this.word[this.currentIndex];
+        } else {
+            this.currentLetterSpan.textContent = '✓';
+        }
+    }
+    
+    checkLetterMatch(detectedLetter) {
+        if (!this.gameActive || this.currentIndex >= this.word.length) {
+            return;
+        }
+        
+        const expectedLetter = this.word[this.currentIndex];
+        
+        if (detectedLetter === expectedLetter) {
+            this.markLetterCorrect();
+            this.currentIndex++;
+            
+            if (this.currentIndex >= this.word.length) {
+                this.completeGame();
+            } else {
+                this.updateCurrentLetter();
+                this.updateProgress();
+                this.updateCurrentLetterHighlight();
+            }
+        }
+    }
+    
+    markLetterCorrect() {
+        const letterBox = document.getElementById(`letter-${this.currentIndex}`);
+        if (letterBox) {
+            letterBox.classList.remove('current');
+            letterBox.classList.add('correct');
+        }
+        
+        // Calcular tempo da letra
+        const letterEndTime = new Date();
+        const letterTime = (letterEndTime - this.letterStartTime) / 1000; // em segundos
+        
+        const completedLetter = this.word[this.currentIndex];
+        
+        // Salvar estatísticas da letra
+        this.saveLetterStats(completedLetter, letterTime);
+        
+        // Preparar para próxima letra
+        this.letterStartTime = new Date();
+        
+        console.log(`Letra ${completedLetter} completada em ${letterTime.toFixed(2)}s`);
+    }
+    
+    async saveLetterStats(letter, completionTime) {
+        try {
+            // Obter score de similaridade do último reconhecimento
+            let similarityScore = null;
+            if (this.handTracker && this.handTracker.lastDetailedResult) {
+                similarityScore = this.handTracker.lastDetailedResult.similarity;
+            }
+            
+            const data = {
+                letter: letter,
+                word: this.word,
+                position: this.currentIndex,
+                time: completionTime,
+                similarity: similarityScore
+            };
+            
+            const response = await fetch('/api/save_soletrando_letter', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                console.log(`✅ Estatísticas salvas: ${letter} - ${completionTime.toFixed(2)}s`);
+                
+                // Salvar localmente também
+                this.letterTimes.push({
+                    letter: letter,
+                    time: completionTime,
+                    position: this.currentIndex,
+                    similarity: similarityScore,
+                    timestamp: new Date().toISOString()
+                });
+            } else {
+                console.warn(`⚠️ Erro ao salvar estatísticas: ${result.error}`);
+            }
+        } catch (error) {
+            console.error('❌ Erro ao comunicar com servidor:', error);
+        }
+    }
+    
+    updateCurrentLetterHighlight() {
+        // Remove current class from all
+        document.querySelectorAll('.letter-box').forEach(box => {
+            box.classList.remove('current');
+        });
+        
+        // Add current class to new letter
+        if (this.currentIndex < this.word.length) {
+            const currentBox = document.getElementById(`letter-${this.currentIndex}`);
+            if (currentBox) {
+                currentBox.classList.add('current');
+            }
+        }
+    }
+    
+    completeGame() {
+        this.gameActive = false;
+        
+        // Calcular estatísticas finais
+        const gameEndTime = new Date();
+        const totalGameTime = (gameEndTime - this.gameStartTime) / 1000;
+        
+        console.log(`🎉 Palavra "${this.word}" completada!`);
+        console.log(`⏱️ Tempo total: ${totalGameTime.toFixed(2)}s`);
+        console.log(`📊 Letras: ${this.letterTimes.length}`);
+        
+        if (this.letterTimes.length > 0) {
+            const avgTime = this.letterTimes.reduce((sum, lt) => sum + lt.time, 0) / this.letterTimes.length;
+            console.log(`📈 Tempo médio por letra: ${avgTime.toFixed(2)}s`);
+        }
+        
+        this.completedWordSpan.textContent = this.word;
+        this.successModal.show();
+    }
+    
+    showHelp() {
+        if (!this.gameActive || this.currentIndex >= this.word.length) {
+            alert('Não há letra atual para mostrar ajuda!');
+            return;
+        }
+        
+        const currentLetter = this.word[this.currentIndex];
+        this.helpLetter.textContent = currentLetter;
+        this.helpLetterText.textContent = currentLetter;
+        
+        // Carregar vídeo
+        fetch(`/api/get_video_demo/${currentLetter}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    this.helpVideo.src = data.video_url;
+                    this.helpModal.show();
+                } else {
+                    alert(`Vídeo não disponível para a letra ${currentLetter}`);
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao carregar vídeo:', error);
+                alert('Erro ao carregar vídeo de ajuda');
+            });
+    }
+    
+    startCamera() {
+        if (!this.handTracker) {
+            this.initializeHandTracker();
+        }
+        
+        if (this.handTracker) {
+            this.handTracker.startCamera();
+            this.startCameraBtn.disabled = true;
+            this.stopCameraBtn.disabled = false;
+            this.cameraStatus.textContent = 'Câmera iniciando...';
+        }
+    }
+    
+    stopCamera() {
+        if (this.handTracker) {
+            this.handTracker.stopCamera();
+            this.startCameraBtn.disabled = false;
+            this.stopCameraBtn.disabled = true;
+            this.cameraStatus.textContent = 'Câmera desligada';
+        }
+    }
+    
+    initializeHandTracker() {
+        try {
+            this.handTracker = new HandTracker();
+            
+            // Override do método de atualização de letra para integrar com o jogo
+            const originalUpdateLetter = this.handTracker.updateDetectedLetter.bind(this.handTracker);
+            this.handTracker.updateDetectedLetter = (letter, detailedResult) => {
+                originalUpdateLetter(letter, detailedResult);
+                
+                // Salvar último resultado para estatísticas
+                if (detailedResult) {
+                    this.handTracker.lastDetailedResult = detailedResult;
+                }
+                
+                // Integrar com o jogo
+                if (letter && letter !== '-') {
+                    this.checkLetterMatch(letter);
+                }
+            };
+            
+            console.log('HandTracker inicializado para o jogo Soletrando com tracking');
+        } catch (error) {
+            console.error('Erro ao inicializar HandTracker:', error);
+            alert('Erro ao inicializar sistema de reconhecimento');
+        }
+    }
+}
+
+// Inicializar jogo quando a página carregar
+window.addEventListener('load', function() {
+    console.log('Iniciando jogo Soletrando...');
+    
+    setTimeout(() => {
+        if (typeof HandTracker !== 'undefined') {
+            window.soletrandoGame = new SoletrandoGame();
+            console.log('✅ Jogo Soletrando inicializado');
+        } else {
+            console.error('❌ HandTracker não disponível');
+        }
+    }, 1500);
+});
+</script>
+{% endblock %}

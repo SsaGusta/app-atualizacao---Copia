@@ -1,0 +1,413 @@
+{% extends "base.html" %}
+
+{% block title %}Administração ML - LIBRAS{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>
+                <i class="fas fa-brain text-primary"></i>
+                Administração de Machine Learning
+            </h2>
+            <div>
+                <button class="btn btn-success me-2" id="trainAllBtn">
+                    <i class="fas fa-play"></i> Treinar Todos
+                </button>
+                <a href="{{ url_for('admin') }}" class="btn btn-outline-primary">
+                    <i class="fas fa-arrow-left"></i> Voltar ao Admin
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Status Cards -->
+<div class="row mb-4">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <i class="fas fa-database fa-2x mb-2"></i>
+                <h4 id="totalExamples">-</h4>
+                <small>Exemplos Coletados</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <i class="fas fa-check-circle fa-2x mb-2"></i>
+                <h4 id="trainedModels">-</h4>
+                <small>Modelos Treinados</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <i class="fas fa-percentage fa-2x mb-2"></i>
+                <h4 id="avgAccuracy">-</h4>
+                <small>Precisão Média</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body text-center">
+                <i class="fas fa-clock fa-2x mb-2"></i>
+                <h4 id="lastTraining">-</h4>
+                <small>Último Treinamento</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Models Grid -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-cogs"></i> Status dos Modelos por Letra
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row" id="modelsGrid">
+                    <!-- Modelos serão carregados via JavaScript -->
+                    <div class="col-12 text-center py-4">
+                        <i class="fas fa-spinner fa-spin fa-2x text-muted"></i>
+                        <p class="mt-2 text-muted">Carregando status dos modelos...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Training Log -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-list"></i> Log de Treinamento
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="trainingLog" style="max-height: 300px; overflow-y: auto;">
+                    <p class="text-muted">Log de treinamento aparecerá aqui...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Feedback Modal -->
+<div class="modal fade" id="feedbackModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-comment"></i> Feedback para Letra <span id="feedbackLetter">-</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Esta predição está correta?</label>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-success" id="feedbackCorrect">
+                            <i class="fas fa-check"></i> Correto
+                        </button>
+                        <button class="btn btn-danger" id="feedbackIncorrect">
+                            <i class="fas fa-times"></i> Incorreto
+                        </button>
+                    </div>
+                </div>
+                <div class="mb-3" id="correctionSection" style="display: none;">
+                    <label class="form-label">Qual é a letra correta?</label>
+                    <select class="form-select" id="correctLetter">
+                        <option value="">Selecione a letra correta...</option>
+                        <!-- Letras serão adicionadas via JavaScript -->
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="submitFeedback">Enviar Feedback</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.model-card {
+    transition: transform 0.2s ease;
+    cursor: pointer;
+}
+
+.model-card:hover {
+    transform: translateY(-2px);
+}
+
+.model-status {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+
+.status-trained { background-color: #28a745; }
+.status-training { background-color: #ffc107; }
+.status-no-data { background-color: #dc3545; }
+.status-insufficient { background-color: #fd7e14; }
+
+.letter-display {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #495057;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+class MLAdminPanel {
+    constructor() {
+        this.stats = {};
+        this.feedbackModal = new bootstrap.Modal(document.getElementById('feedbackModal'));
+        this.currentFeedback = null;
+        
+        this.initializeElements();
+        this.bindEvents();
+        this.loadStats();
+        
+        // Atualizar a cada 30 segundos
+        setInterval(() => this.loadStats(), 30000);
+    }
+    
+    initializeElements() {
+        this.trainAllBtn = document.getElementById('trainAllBtn');
+        this.totalExamples = document.getElementById('totalExamples');
+        this.trainedModels = document.getElementById('trainedModels');
+        this.avgAccuracy = document.getElementById('avgAccuracy');
+        this.lastTraining = document.getElementById('lastTraining');
+        this.modelsGrid = document.getElementById('modelsGrid');
+        this.trainingLog = document.getElementById('trainingLog');
+        
+        // Elementos do modal de feedback
+        this.feedbackLetter = document.getElementById('feedbackLetter');
+        this.feedbackCorrect = document.getElementById('feedbackCorrect');
+        this.feedbackIncorrect = document.getElementById('feedbackIncorrect');
+        this.correctionSection = document.getElementById('correctionSection');
+        this.correctLetter = document.getElementById('correctLetter');
+        this.submitFeedback = document.getElementById('submitFeedback');
+        
+        // Preencher select de letras
+        for (let i = 0; i < 26; i++) {
+            const letter = String.fromCharCode(65 + i);
+            const option = document.createElement('option');
+            option.value = letter;
+            option.textContent = letter;
+            this.correctLetter.appendChild(option);
+        }
+    }
+    
+    bindEvents() {
+        this.trainAllBtn.addEventListener('click', () => this.trainAllModels());
+        this.feedbackCorrect.addEventListener('click', () => this.handleFeedback(true));
+        this.feedbackIncorrect.addEventListener('click', () => this.handleFeedback(false));
+        this.submitFeedback.addEventListener('click', () => this.submitFeedbackData());
+    }
+    
+    async loadStats() {
+        try {
+            const response = await fetch('/api/ml/stats');
+            const data = await response.json();
+            
+            if (data.success) {
+                this.stats = data.stats;
+                this.updateDisplay();
+            } else {
+                console.error('Erro ao carregar estatísticas:', data.error);
+            }
+        } catch (error) {
+            console.error('Erro ao comunicar com servidor:', error);
+        }
+    }
+    
+    updateDisplay() {
+        // Calcular totais
+        let totalExamples = 0;
+        let trainedCount = 0;
+        let accuracySum = 0;
+        let accuracyCount = 0;
+        let lastTrainingDate = null;
+        
+        for (const [letter, info] of Object.entries(this.stats)) {
+            totalExamples += info.examples || 0;
+            
+            if (info.has_model) {
+                trainedCount++;
+            }
+            
+            if (info.accuracy) {
+                accuracySum += info.accuracy;
+                accuracyCount++;
+                
+                if (info.last_training) {
+                    const date = new Date(info.last_training);
+                    if (!lastTrainingDate || date > lastTrainingDate) {
+                        lastTrainingDate = date;
+                    }
+                }
+            }
+        }
+        
+        // Atualizar cards de status
+        this.totalExamples.textContent = totalExamples.toLocaleString();
+        this.trainedModels.textContent = `${trainedCount}/26`;
+        this.avgAccuracy.textContent = accuracyCount > 0 ? 
+            `${(accuracySum / accuracyCount * 100).toFixed(1)}%` : '-';
+        this.lastTraining.textContent = lastTrainingDate ? 
+            lastTrainingDate.toLocaleDateString() : '-';
+        
+        // Atualizar grid de modelos
+        this.updateModelsGrid();
+    }
+    
+    updateModelsGrid() {
+        const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+        
+        this.modelsGrid.innerHTML = '';
+        
+        letters.forEach(letter => {
+            const info = this.stats[letter] || { examples: 0, has_model: false };
+            const col = document.createElement('div');
+            col.className = 'col-lg-2 col-md-3 col-sm-4 col-6 mb-3';
+            
+            let statusClass, statusText;
+            if (info.has_model) {
+                statusClass = 'status-trained';
+                statusText = 'Treinado';
+            } else if (info.examples >= 10) {
+                statusClass = 'status-training';
+                statusText = 'Pronto para treinar';
+            } else if (info.examples > 0) {
+                statusClass = 'status-insufficient';
+                statusText = 'Poucos exemplos';
+            } else {
+                statusClass = 'status-no-data';
+                statusText = 'Sem dados';
+            }
+            
+            col.innerHTML = `
+                <div class="card model-card position-relative" onclick="mlAdmin.trainLetter('${letter}')">
+                    <div class="model-status ${statusClass}" title="${statusText}"></div>
+                    <div class="card-body text-center">
+                        <div class="letter-display">${letter}</div>
+                        <small class="text-muted">${info.examples || 0} exemplos</small>
+                        ${info.accuracy ? `<br><small class="text-success">${(info.accuracy * 100).toFixed(1)}%</small>` : ''}
+                        ${info.has_model ? '<br><i class="fas fa-check text-success"></i>' : ''}
+                    </div>
+                </div>
+            `;
+            
+            this.modelsGrid.appendChild(col);
+        });
+    }
+    
+    async trainLetter(letter) {
+        const info = this.stats[letter];
+        
+        if (!info || info.examples < 5) {
+            alert(`Exemplos insuficientes para treinar a letra ${letter}. Mínimo: 5, atual: ${info?.examples || 0}`);
+            return;
+        }
+        
+        this.addToLog(`Iniciando treinamento da letra ${letter}...`);
+        
+        try {
+            const response = await fetch(`/api/ml/train/${letter}`, {
+                method: 'POST'
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                this.addToLog(`✅ Letra ${letter} treinada com sucesso!`);
+                this.loadStats(); // Recarregar estatísticas
+            } else {
+                this.addToLog(`❌ Erro no treinamento da letra ${letter}: ${data.error}`);
+            }
+        } catch (error) {
+            this.addToLog(`❌ Erro ao treinar letra ${letter}: ${error.message}`);
+        }
+    }
+    
+    async trainAllModels() {
+        this.trainAllBtn.disabled = true;
+        this.trainAllBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Treinando...';
+        
+        this.addToLog('Iniciando treinamento de todos os modelos...');
+        
+        try {
+            const response = await fetch('/api/ml/train_all', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ min_examples: 10 })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                this.addToLog(`✅ Treinamento concluído: ${data.trained_count} modelos atualizados`);
+            } else {
+                this.addToLog(`❌ Erro no treinamento: ${data.error}`);
+            }
+        } catch (error) {
+            this.addToLog(`❌ Erro ao treinar modelos: ${error.message}`);
+        } finally {
+            this.trainAllBtn.disabled = false;
+            this.trainAllBtn.innerHTML = '<i class="fas fa-play"></i> Treinar Todos';
+            this.loadStats();
+        }
+    }
+    
+    addToLog(message) {
+        const timestamp = new Date().toLocaleTimeString();
+        const logEntry = document.createElement('div');
+        logEntry.className = 'mb-1';
+        logEntry.innerHTML = `<small class="text-muted">${timestamp}</small> ${message}`;
+        
+        this.trainingLog.insertBefore(logEntry, this.trainingLog.firstChild);
+        
+        // Limitar a 50 entradas
+        while (this.trainingLog.children.length > 50) {
+            this.trainingLog.removeChild(this.trainingLog.lastChild);
+        }
+    }
+    
+    handleFeedback(isCorrect) {
+        if (isCorrect) {
+            this.correctionSection.style.display = 'none';
+        } else {
+            this.correctionSection.style.display = 'block';
+        }
+    }
+    
+    async submitFeedbackData() {
+        // Implementar envio de feedback se necessário
+        this.feedbackModal.hide();
+        this.addToLog('Feedback registrado com sucesso');
+    }
+}
+
+// Inicializar quando a página carregar
+window.addEventListener('load', function() {
+    window.mlAdmin = new MLAdminPanel();
+});
+</script>
+{% endblock %}

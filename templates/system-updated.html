@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🔧 Forçar Refresh - Sistema Atualizado</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; text-align: center; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .success { color: #28a745; font-weight: bold; }
+        .info { color: #17a2b8; font-weight: bold; }
+        button { padding: 15px 30px; margin: 10px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
+        button:hover { background: #0056b3; }
+        .highlight { background: #fff3cd; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Sistema Atualizado!</h1>
+        
+        <div class="highlight">
+            <h3>✅ Correções Aplicadas:</h3>
+            <ul style="text-align: left;">
+                <li><strong>Threshold reduzido:</strong> 75% → 50% (mais tolerante)</li>
+                <li><strong>Estabilidade:</strong> 3 frames → 2 frames (mais rápido)</li>
+                <li><strong>Confiança mínima:</strong> 70% → 50% no jogo</li>
+            </ul>
+        </div>
+        
+        <div class="success">
+            <h3>🚀 O que mudou:</h3>
+            <p>O sistema agora é MUITO mais tolerante às variações na posição da mão!</p>
+        </div>
+        
+        <div class="info">
+            <h3>📋 Como testar:</h3>
+            <ol style="text-align: left;">
+                <li>Pressione <strong>Ctrl+F5</strong> na página do jogo para forçar atualização</li>
+                <li>Ou feche e abra uma nova aba do navegador</li>
+                <li>Tente fazer a letra A novamente</li>
+                <li>Agora deve reconhecer mesmo com pequenas variações!</li>
+            </ol>
+        </div>
+        
+        <button onclick="window.location.href='/mediapipe'">✋ Ir para MediaPipe</button>
+        <button onclick="window.location.href='/admin'">👑 Ir para Admin</button>
+        
+        <div style="margin-top: 30px; padding: 15px; background: #e9ecef; border-radius: 5px;">
+            <strong>💡 Dica:</strong> Se ainda não funcionar, tente recapturar a letra A no admin em uma posição ligeiramente diferente para ter mais variação nos dados de treinamento.
+        </div>
+        
+        <script>
+            // Forçar reload da página principal
+            if (window.opener) {
+                window.opener.location.reload(true);
+            }
+            
+            // Auto-redirect após alguns segundos
+            setTimeout(() => {
+                if (confirm('Ir para o MediaPipe agora para testar?')) {
+                    window.location.href = '/mediapipe';
+                }
+            }, 3000);
+        </script>
+    </div>
+</body>
+</html>

@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🔍 Diagnóstico Detalhado - Problema de Reconhecimento</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .diagnostic-section { 
+            border: 2px solid #007bff; 
+            margin: 15px 0; 
+            padding: 20px; 
+            border-radius: 8px; 
+            background: #f8f9fa;
+        }
+        .success { color: #28a745; font-weight: bold; }
+        .error { color: #dc3545; font-weight: bold; }
+        .warning { color: #ffc107; font-weight: bold; }
+        .info { color: #17a2b8; font-weight: bold; }
+        button { 
+            padding: 12px 20px; 
+            margin: 8px; 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            font-size: 14px;
+        }
+        button:hover { background: #0056b3; }
+        #output { 
+            background: #ffffff; 
+            padding: 20px; 
+            border-radius: 8px; 
+            margin-top: 20px; 
+            white-space: pre-wrap; 
+            border: 1px solid #ddd;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .step { 
+            background: #e9ecef; 
+            padding: 10px; 
+            margin: 5px 0; 
+            border-left: 4px solid #007bff; 
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Diagnóstico: Por que a letra A não é reconhecida?</h1>
+    
+    <div class="diagnostic-section">
+        <h3>📋 Checklist de Diagnóstico</h3>
+        <button onclick="runFullDiagnostic()">🚀 Executar Diagnóstico Completo</button>
+        <button onclick="testLetterA()">🔤 Testar Especificamente Letra A</button>
+        <button onclick="compareGestureQuality()">📊 Comparar Qualidade dos Gestos</button>
+        <button onclick="testRecognitionFlow()">🔄 Testar Fluxo de Reconhecimento</button>
+    </div>
+    
+    <div class="diagnostic-section">
+        <h3>🛠️ Testes Específicos</h3>
+        <button onclick="checkGameIntegration()">🎮 Verificar Integração com Jogo</button>
+        <button onclick="simulateGameRecognition()">🎯 Simular Reconhecimento no Jogo</button>
+        <button onclick="checkThresholds()">⚖️ Verificar Thresholds de Confiança</button>
+        <button onclick="debugLandmarks()">📍 Debug Landmarks</button>
+    </div>
+    
+    <div id="output">Clique em um botão para iniciar o diagnóstico...</div>
+
+    <script src="/static/js/custom-gesture-recognizer.js"></script>
+    <script>
+        const output = document.getElementById('output');
+        let recognizer = null;
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const emoji = type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️';
+            output.textContent += `[${timestamp}] ${emoji} ${message}\n`;
+            console.log(message);
+        }
+        
+        function clearOutput() {
+            output.textContent = '';
+        }
+        
+        async function runFullDiagnostic() {
+            clearOutput();
+            log('🔍 INICIANDO DIAGNÓSTICO COMPLETO...', 'info');
+            log('='.repeat(50));
+            
+            // Passo 1: Verificar APIs
+            log('📡 PASSO 1: Verificando APIs...', 'info');
+            await checkAPIs();
+            
+            // Passo 2: Verificar gestos salvos
+            log('💾 PASSO 2: Verificando gestos salvos...', 'info');
+            await checkSavedGestures();
+            
+            // Passo 3: Verificar reconhecedor
+            log('🤖 PASSO 3: Verificando reconhecedor...', 'info');
+            await checkRecognizer();
+            
+            // Passo 4: Testar reconhecimento
+            log('🎯 PASSO 4: Testando reconhecimento...', 'info');
+            await testRecognition();
+            
+            log('='.repeat(50));
+            log('🏁 DIAGNÓSTICO CONCLUÍDO!', 'success');
+        }
+        
+        async function checkAPIs() {
+            try {
+                const response = await fetch('/api/get_gestures');
+                if (response.ok) {
+                    const gestures = await response.json();
+                    log(`✅ API funcionando - ${Object.keys(gestures).length} gestos encontrados`, 'success');
+                    return gestures;
+                } else {
+                    log(`❌ API com erro: ${response.status}`, 'error');
+                    return null;
+                }
+            } catch (error) {
+                log(`❌ Erro na API: ${error.message}`, 'error');
+                return null;
+            }
+        }
+        
+        async function checkSavedGestures() {
+            const gestures = await checkAPIs();
+            if (!gestures) return false;
+            
+            if (gestures.A) {
+                log(`✅ Letra A encontrada no banco!`, 'success');
+                log(`   Qualidade: ${gestures.A.quality}%`, 'info');
+                log(`   Criado em: ${gestures.A.created_at}`, 'info');
+                log(`   Landmarks: ${gestures.A.landmarks.length} pontos`, 'info');
+                return true;
+            } else {
+                log(`❌ Letra A NÃO encontrada no banco!`, 'error');
+                log(`💡 Solução: Capture a letra A em /admin`, 'warning');
+                return false;
+            }
+        }
+        
+        async function checkRecognizer() {
+            try {
+                recognizer = new CustomGestureRecognizer();
+                
+                // Aguardar carregamento
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                const stats = recognizer.getRecognitionStats();
+                
+                log(`🤖 Reconhecedor inicializado`, 'success');
+                log(`   Gestos carregados: ${stats.gesturesLoaded}`, 'info');
+                log(`   Total de gestos: ${stats.totalGestures}`, 'info');
+                log(`   Letras disponíveis: ${stats.availableLetters.join(', ')}`, 'info');
+                
+                if (stats.availableLetters.includes('A')) {
+                    log(`✅ Letra A disponível no reconhecedor`, 'success');
+                } else {
+                    log(`❌ Letra A NÃO disponível no reconhecedor`, 'error');
+                }
+                
+                return stats.availableLetters.includes('A');
+                
+            } catch (error) {
+                log(`❌ Erro no reconhecedor: ${error.message}`, 'error');
+                return false;
+            }
+        }
+        
+        async function testRecognition() {
+            if (!recognizer) {
+                log(`⚠️ Reconhecedor não inicializado`, 'warning');
+                return;
+            }
+            
+            // Buscar gesto salvo da letra A
+            try {
+                const response = await fetch('/api/get_gestures');
+                const gestures = await response.json();
+                
+                if (!gestures.A) {
+                    log(`❌ Sem gesto da letra A para testar`, 'error');
+                    return;
+                }
+                
+                // Usar landmarks exatos do gesto salvo
+                const savedLandmarks = gestures.A.landmarks;
+                log(`🧪 Testando com landmarks salvos da letra A...`, 'info');
+                
+                const result = await recognizer.recognizeLetter(savedLandmarks);
+                
+                if (result) {
+                    if (result.letter === 'A') {
+                        log(`✅ SUCESSO! Letra A reconhecida`, 'success');
+                        log(`   Confiança: ${(result.confidence * 100).toFixed(1)}%`, 'success');
+                        log(`   Estável: ${result.stable}`, 'info');
+                    } else {
+                        log(`❌ ERRO! Reconheceu '${result.letter}' ao invés de 'A'`, 'error');
+                        log(`   Confiança: ${(result.confidence * 100).toFixed(1)}%`, 'info');
+                    }
+                } else {
+                    log(`❌ FALHA! Nenhuma letra reconhecida`, 'error');
+                    log(`💡 Possíveis causas:`, 'warning');
+                    log(`   - Threshold muito alto (atual: 75%)`, 'warning');
+                    log(`   - Qualidade do gesto muito baixa`, 'warning');
+                    log(`   - Erro no algoritmo de similaridade`, 'warning');
+                }
+                
+            } catch (error) {
+                log(`❌ Erro no teste: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testLetterA() {
+            clearOutput();
+            log('🔤 TESTE ESPECÍFICO DA LETRA A', 'info');
+            log('='.repeat(30));
+            
+            // Verificar se existe
+            const response = await fetch('/api/get_gestures');
+            const gestures = await response.json();
+            
+            if (!gestures.A) {
+                log('❌ Letra A não foi capturada ainda!', 'error');
+                log('💡 Vá para /admin e capture a letra A primeiro', 'warning');
+                return;
+            }
+            
+            const letterA = gestures.A;
+            log(`✅ Letra A encontrada:`, 'success');
+            log(`   📊 Qualidade: ${letterA.quality}%`, 'info');
+            log(`   📅 Capturada em: ${new Date(letterA.created_at).toLocaleString()}`, 'info');
+            log(`   📍 Landmarks: ${letterA.landmarks.length} pontos`, 'info');
+            
+            // Verificar qualidade dos landmarks
+            let validPoints = 0;
+            letterA.landmarks.forEach((point, i) => {
+                if (point.x >= 0 && point.x <= 1 && point.y >= 0 && point.y <= 1) {
+                    validPoints++;
+                }
+            });
+            
+            log(`   ✅ Pontos válidos: ${validPoints}/21 (${((validPoints/21)*100).toFixed(1)}%)`, 'info');
+            
+            if (validPoints < 21) {
+                log(`⚠️ Alguns landmarks estão fora dos limites!`, 'warning');
+            }
+            
+            // Testar reconhecimento direto via API
+            log('🧪 Testando reconhecimento via API...', 'info');
+            
+            try {
+                const recognizeResponse = await fetch('/api/recognize_gesture', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ landmarks: letterA.landmarks })
+                });
+                
+                const recognizeResult = await recognizeResponse.json();
+                
+                if (recognizeResult.success) {
+                    log(`✅ API reconheceu: ${recognizeResult.result.letter}`, 'success');
+                    log(`   Confiança: ${(recognizeResult.result.confidence * 100).toFixed(1)}%`, 'info');
+                } else {
+                    log(`❌ API falhou: ${recognizeResult.error || recognizeResult.message}`, 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ Erro na API: ${error.message}`, 'error');
+            }
+        }
+        
+        async function compareGestureQuality() {
+            clearOutput();
+            log('📊 ANÁLISE DE QUALIDADE DOS GESTOS', 'info');
+            log('='.repeat(35));
+            
+            const response = await fetch('/api/get_gestures');
+            const gestures = await response.json();
+            
+            if (Object.keys(gestures).length === 0) {
+                log('❌ Nenhum gesto encontrado!', 'error');
+                return;
+            }
+            
+            const sortedGestures = Object.entries(gestures)
+                .sort((a, b) => b[1].quality - a[1].quality);
+            
+            log('📈 Gestos ordenados por qualidade:', 'info');
+            
+            sortedGestures.forEach(([letter, data], index) => {
+                const status = data.quality >= 80 ? '✅' : data.quality >= 60 ? '⚠️' : '❌';
+                log(`${index + 1}. ${status} ${letter}: ${data.quality}%`, 'info');
+            });
+            
+            const avgQuality = sortedGestures.reduce((sum, [,data]) => sum + data.quality, 0) / sortedGestures.length;
+            log(`📊 Qualidade média: ${avgQuality.toFixed(1)}%`, 'info');
+            
+            if (gestures.A) {
+                const aQuality = gestures.A.quality;
+                if (aQuality < 70) {
+                    log(`⚠️ Letra A tem qualidade baixa (${aQuality}%)`, 'warning');
+                    log(`💡 Tente recapturar com melhor iluminação/posição`, 'warning');
+                }
+            }
+        }
+        
+        async function testRecognitionFlow() {
+            clearOutput();
+            log('🔄 TESTE DO FLUXO COMPLETO DE RECONHECIMENTO', 'info');
+            log('='.repeat(45));
+            
+            // Simular exatamente o que acontece no jogo
+            log('1️⃣ Inicializando reconhecedor (como no jogo)...', 'info');
+            
+            const gameRecognizer = new CustomGestureRecognizer();
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            log('2️⃣ Obtendo gestos salvos...', 'info');
+            const response = await fetch('/api/get_gestures');
+            const gestures = await response.json();
+            
+            if (!gestures.A) {
+                log('❌ Letra A não disponível!', 'error');
+                return;
+            }
+            
+            log('3️⃣ Simulando captura de landmarks no jogo...', 'info');
+            const testLandmarks = gestures.A.landmarks.map(point => ({
+                x: point.x + (Math.random() - 0.5) * 0.02, // Pequena variação
+                y: point.y + (Math.random() - 0.5) * 0.02,
+                z: point.z + (Math.random() - 0.5) * 0.01
+            }));
+            
+            log('4️⃣ Tentando reconhecimento...', 'info');
+            
+            for (let attempt = 1; attempt <= 5; attempt++) {
+                const result = await gameRecognizer.recognizeLetter(testLandmarks);
+                
+                if (result) {
+                    log(`   Tentativa ${attempt}: ${result.letter} (${(result.confidence * 100).toFixed(1)}%) - Estável: ${result.stable}`, 
+                        result.letter === 'A' ? 'success' : 'warning');
+                    
+                    if (result.stable && result.letter === 'A') {
+                        log('✅ SUCESSO! Reconhecimento estável da letra A', 'success');
+                        break;
+                    }
+                } else {
+                    log(`   Tentativa ${attempt}: Nenhuma letra reconhecida`, 'warning');
+                }
+                
+                // Pequena pausa entre tentativas
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+        }
+        
+        async function checkGameIntegration() {
+            clearOutput();
+            log('🎮 VERIFICANDO INTEGRAÇÃO COM O JOGO', 'info');
+            log('='.repeat(35));
+            
+            // Verificar se o script está carregado no jogo
+            log('🔍 Verificando arquivos JavaScript...', 'info');
+            
+            try {
+                // Tentar carregar o script do reconhecedor
+                const scriptResponse = await fetch('/static/js/custom-gesture-recognizer.js');
+                if (scriptResponse.ok) {
+                    log('✅ Script custom-gesture-recognizer.js carregado', 'success');
+                } else {
+                    log('❌ Erro ao carregar script principal', 'error');
+                }
+                
+                // Verificar se a classe existe
+                if (typeof CustomGestureRecognizer !== 'undefined') {
+                    log('✅ Classe CustomGestureRecognizer disponível', 'success');
+                } else {
+                    log('❌ Classe CustomGestureRecognizer não encontrada', 'error');
+                }
+                
+                log('💡 Para resolver problemas no jogo:', 'info');
+                log('   1. Recarregue a página do jogo (F5)', 'info');
+                log('   2. Verifique console do navegador (F12)', 'info');
+                log('   3. Certifique-se que capturou a letra A em /admin', 'info');
+                
+            } catch (error) {
+                log(`❌ Erro na verificação: ${error.message}`, 'error');
+            }
+        }
+        
+        async function simulateGameRecognition() {
+            clearOutput();
+            log('🎯 SIMULAÇÃO DO RECONHECIMENTO NO JOGO', 'info');
+            log('='.repeat(40));
+            
+            log('🔧 Configurações do sistema:', 'info');
+            log('   - Threshold de confiança: 75%', 'info');
+            log('   - Frames para estabilidade: 3', 'info');
+            log('   - Distância máxima: 2.0', 'info');
+            
+            // Buscar letra A
+            const response = await fetch('/api/get_gestures');
+            const gestures = await response.json();
+            
+            if (!gestures.A) {
+                log('❌ Letra A não capturada!', 'error');
+                return;
+            }
+            
+            log('🎯 Testando com diferentes níveis de precisão...', 'info');
+            
+            const testCases = [
+                { name: 'Landmarks idênticos', variation: 0 },
+                { name: 'Pequena variação (1%)', variation: 0.01 },
+                { name: 'Variação média (3%)', variation: 0.03 },
+                { name: 'Variação alta (5%)', variation: 0.05 },
+                { name: 'Variação muito alta (10%)', variation: 0.10 }
+            ];
+            
+            const gameRecognizer = new CustomGestureRecognizer();
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
+            for (const testCase of testCases) {
+                log(`\n🧪 Teste: ${testCase.name}`, 'info');
+                
+                const testLandmarks = gestures.A.landmarks.map(point => ({
+                    x: point.x + (Math.random() - 0.5) * testCase.variation,
+                    y: point.y + (Math.random() - 0.5) * testCase.variation,
+                    z: point.z + (Math.random() - 0.5) * testCase.variation * 0.5
+                }));
+                
+                const result = await gameRecognizer.recognizeLetter(testLandmarks);
+                
+                if (result && result.letter === 'A') {
+                    log(`   ✅ Reconhecido: ${(result.confidence * 100).toFixed(1)}%`, 'success');
+                } else if (result) {
+                    log(`   ⚠️ Reconheceu '${result.letter}' (${(result.confidence * 100).toFixed(1)}%)`, 'warning');
+                } else {
+                    log(`   ❌ Não reconhecido`, 'error');
+                }
+            }
+        }
+        
+        async function checkThresholds() {
+            clearOutput();
+            log('⚖️ ANÁLISE DOS THRESHOLDS DE CONFIANÇA', 'info');
+            log('='.repeat(40));
+            
+            log('🔧 Threshold atual: 75%', 'info');
+            log('💡 Testando com diferentes thresholds...', 'info');
+            
+            const response = await fetch('/api/get_gestures');
+            const gestures = await response.json();
+            
+            if (!gestures.A) {
+                log('❌ Letra A não disponível para teste', 'error');
+                return;
+            }
+            
+            // Simular reconhecimento com diferentes thresholds
+            const testLandmarks = gestures.A.landmarks;
+            
+            const thresholds = [0.5, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9];
+            
+            for (const threshold of thresholds) {
+                try {
+                    const recognizeResponse = await fetch('/api/recognize_gesture', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ landmarks: testLandmarks })
+                    });
+                    
+                    const result = await recognizeResponse.json();
+                    
+                    if (result.success && result.result.confidence >= threshold) {
+                        log(`✅ Threshold ${(threshold*100).toFixed(0)}%: APROVADO (${(result.result.confidence*100).toFixed(1)}%)`, 'success');
+                    } else {
+                        log(`❌ Threshold ${(threshold*100).toFixed(0)}%: REPROVADO`, 'error');
+                    }
+                    
+                } catch (error) {
+                    log(`❌ Erro no teste: ${error.message}`, 'error');
+                }
+            }
+            
+            log('\n💡 Recomendações:', 'info');
+            log('   - Se muitos reprovados: diminuir threshold', 'info');
+            log('   - Se falsos positivos: aumentar threshold', 'info');
+        }
+        
+        async function debugLandmarks() {
+            clearOutput();
+            log('📍 DEBUG DETALHADO DOS LANDMARKS', 'info');
+            log('='.repeat(35));
+            
+            const response = await fetch('/api/get_gestures');
+            const gestures = await response.json();
+            
+            if (!gestures.A) {
+                log('❌ Letra A não disponível', 'error');
+                return;
+            }
+            
+            const landmarks = gestures.A.landmarks;
+            
+            log('📊 Análise dos 21 landmarks da letra A:', 'info');
+            log('='.repeat(35));
+            
+            landmarks.forEach((point, index) => {
+                const fingerNames = [
+                    'Pulso', 'Polegar_CMC', 'Polegar_MCP', 'Polegar_IP', 'Polegar_Ponta',
+                    'Indicador_MCP', 'Indicador_PIP', 'Indicador_DIP', 'Indicador_Ponta',
+                    'Médio_MCP', 'Médio_PIP', 'Médio_DIP', 'Médio_Ponta',
+                    'Anelar_MCP', 'Anelar_PIP', 'Anelar_DIP', 'Anelar_Ponta',
+                    'Mindinho_MCP', 'Mindinho_PIP', 'Mindinho_DIP', 'Mindinho_Ponta'
+                ];
+                
+                const name = fingerNames[index] || `Ponto_${index}`;
+                const valid = point.x >= 0 && point.x <= 1 && point.y >= 0 && point.y <= 1;
+                const status = valid ? '✅' : '❌';
+                
+                log(`${index.toString().padStart(2)}: ${status} ${name.padEnd(15)} X:${point.x.toFixed(3)} Y:${point.y.toFixed(3)} Z:${point.z.toFixed(3)}`, 'info');
+            });
+            
+            // Verificar se a mão está "fechada" (característica da letra A)
+            const fingertips = [4, 8, 12, 16, 20]; // Pontas dos dedos
+            const palm = landmarks[0]; // Pulso
+            
+            let avgDistanceToPalm = 0;
+            fingertips.forEach(tipIndex => {
+                const tip = landmarks[tipIndex];
+                const distance = Math.sqrt(
+                    Math.pow(tip.x - palm.x, 2) + 
+                    Math.pow(tip.y - palm.y, 2)
+                );
+                avgDistanceToPalm += distance;
+            });
+            avgDistanceToPalm /= fingertips.length;
+            
+            log(`\n🤏 Análise da "fechadura" da mão:`, 'info');
+            log(`   Distância média das pontas ao pulso: ${avgDistanceToPalm.toFixed(3)}`, 'info');
+            
+            if (avgDistanceToPalm < 0.15) {
+                log(`   ✅ Mão parece fechada (boa para letra A)`, 'success');
+            } else {
+                log(`   ⚠️ Mão parece aberta (pode não ser letra A ideal)`, 'warning');
+            }
+        }
+    </script>
+</body>
+</html>

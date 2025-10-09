@@ -54,6 +54,27 @@ except ImportError as e:
     palavras_avancado = ["MUNDO", "BRASIL", "AMIGO"]
     palavras_expert = ["INTELIGENCIA", "PROGRAMACAO"]
 
+try:
+    from gesture_manager import GestureManager
+    GESTURE_MANAGER_AVAILABLE = True
+    logger.info("Módulo gesture_manager importado com sucesso")
+    gesture_manager = GestureManager()
+except ImportError as e:
+    GESTURE_MANAGER_AVAILABLE = False
+    print(f"Aviso: Sistema de gestos não disponível: {e}")
+    gesture_manager = None
+
+# Importar sistema de Machine Learning
+try:
+    from ml_system import LibrasMLSystem
+    ML_SYSTEM_AVAILABLE = True
+    logger.info("Sistema de ML importado com sucesso")
+    ml_system = LibrasMLSystem()
+except ImportError as e:
+    ML_SYSTEM_AVAILABLE = False
+    print(f"Aviso: Sistema de ML não disponível: {e}")
+    ml_system = None
+
 # ===== CONFIGURAÇÃO DA APLICAÇÃO =====
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'libras_web_app_2025_secret_key')
@@ -71,13 +92,6 @@ if CORS_AVAILABLE:
 # Sistema de reconhecimento desabilitado para deploy
 RECOGNITION_ENABLED = False
 
-# Variáveis globais para o jogo
-current_word = ""
-current_mode = "iniciante"
-game_active = False
-score = 0
-words_completed = []
-
 # ===== FUNÇÕES AUXILIARES =====
 def get_video_path(letra):
     """Obter caminho do vídeo para uma letra específica"""
@@ -85,28 +99,6 @@ def get_video_path(letra):
     if os.path.exists(video_path):
         return video_path
     return None
-
-def get_random_word(mode="iniciante"):
-    """Obter palavra aleatória baseada no modo de dificuldade"""
-    import random
-    
-    if mode == "iniciante":
-        # Iniciante: palavras de 2-5 letras
-        palavras_filtradas = [palavra for palavra in palavras_iniciante if 2 <= len(palavra) <= 5]
-        return random.choice(palavras_filtradas) if palavras_filtradas else random.choice(palavras_iniciante)
-    elif mode == "intermediario":
-        # Intermediário: qualquer palavra simples (sem restrição de tamanho)
-        return random.choice(palavras)
-    elif mode == "avancado":
-        # Avançado: palavras compostas (com hífen)
-        return random.choice(palavras_avancado)
-    elif mode == "expert":
-        # Expert: frases completas
-        return random.choice(palavras_expert)
-    else:
-        # Padrão: iniciante
-        palavras_filtradas = [palavra for palavra in palavras_iniciante if 2 <= len(palavra) <= 5]
-        return random.choice(palavras_filtradas) if palavras_filtradas else random.choice(palavras_iniciante)
 
 # ===== ROTAS PRINCIPAIS =====
 @app.route('/')
@@ -135,10 +127,10 @@ def login():
                 return jsonify({
                     "success": True,
                     "message": "Login realizado com sucesso",
-                    "redirect": url_for('game')
+                    "redirect": url_for('mediapipe')
                 })
             else:
-                return redirect(url_for('game'))
+                return redirect(url_for('mediapipe'))
         else:
             # Se for requisição AJAX, retornar erro JSON
             if request.is_json or request.headers.get('Content-Type') == 'application/json':
@@ -151,20 +143,22 @@ def login():
     
     return render_template('login.html')
 
-@app.route('/game')
-def game():
-    """Página principal do jogo"""
-    if 'username' not in session:
-        return redirect(url_for('login'))
-    
-    return render_template('game.html', 
-                         username=session['username'],
-                         recognition_enabled=RECOGNITION_ENABLED)
-
 @app.route('/mediapipe')
 def mediapipe():
     """Página de reconhecimento de mãos com MediaPipe"""
     return render_template('mediapipe.html')
+
+@app.route('/admin')
+def admin():
+    """Página de administração para captura de gestos"""
+    # Por segurança, pode adicionar autenticação admin aqui
+    return render_template('admin.html')
+
+@app.route('/ml_admin')
+def ml_admin():
+    """Página de administração do sistema de Machine Learning"""
+    # Por segurança, pode adicionar autenticação admin aqui
+    return render_template('ml_admin.html')
 
 @app.route('/statistics')
 def statistics():
@@ -173,157 +167,30 @@ def statistics():
         return redirect(url_for('login'))
     
     stats = {}
+    soletrando_stats = {}
+    
     if DATABASE_AVAILABLE:
         try:
             db = LibrasDatabase()
+            
+            # Estatísticas gerais existentes
             stats = db.get_user_statistics(session['username'])
+            
+            # Estatísticas específicas do Soletrando
+            user_result = db.get_user(session['username'])
+            if user_result:
+                user_id = user_result[0]
+                soletrando_stats = db.get_soletrando_stats(user_id)
+            
         except Exception as e:
             logger.error(f"Erro ao carregar estatísticas: {e}")
             stats = {"error": "Não foi possível carregar as estatísticas"}
+            soletrando_stats = {"error": "Erro ao carregar estatísticas do Soletrando"}
     else:
         stats = {"info": "Sistema de estatísticas não disponível"}
+        soletrando_stats = {"info": "Sistema de estatísticas não disponível"}
     
-    return render_template('statistics.html', stats=stats)
-
-# ===== API ROUTES =====
-@app.route('/api/start_game', methods=['POST'])
-def start_game():
-    """Iniciar novo jogo"""
-    global current_word, current_mode, game_active, score, words_completed
-    
-    try:
-        data = request.get_json()
-        mode = data.get('mode', 'iniciante') if data else 'iniciante'
-        
-        current_mode = mode
-        current_word = get_random_word(mode)
-        game_active = True
-        score = 0
-        words_completed = []
-        
-        logger.info(f"Jogo iniciado - Modo: {mode}, Palavra: {current_word}")
-        
-        return jsonify({
-            "success": True,
-            "word": current_word,
-            "mode": mode,
-            "recognition_enabled": RECOGNITION_ENABLED,
-            "message": f"Jogo iniciado no modo {mode}. Palavra: {current_word}"
-        })
-    except Exception as e:
-        logger.error(f"Erro ao iniciar jogo: {e}")
-        return jsonify({
-            "success": False,
-            "error": f"Erro ao iniciar jogo: {e}"
-        })
-
-@app.route('/api/next_word', methods=['POST'])
-def next_word():
-    """Próxima palavra do jogo"""
-    global current_word, words_completed
-    
-    if game_active:
-        # Adicionar palavra atual como completada
-        if current_word:
-            words_completed.append(current_word)
-        
-        # Obter próxima palavra
-        current_word = get_random_word(current_mode)
-        
-        return jsonify({
-            "success": True,
-            "word": current_word,
-            "completed_words": len(words_completed)
-        })
-    
-    return jsonify({"success": False, "error": "Jogo não está ativo"})
-
-@app.route('/api/check_letter', methods=['POST'])
-def check_letter():
-    """Verificar letra (simulado sem reconhecimento)"""
-    try:
-        data = request.get_json()
-        letter = data.get('letter', '').upper()
-        
-        if not current_word:
-            return jsonify({"success": False, "error": "Nenhuma palavra ativa"})
-        
-        # Simulação: sempre retorna sucesso para demonstração
-        if letter in current_word:
-            return jsonify({
-                "success": True,
-                "letter": letter,
-                "word": current_word,
-                "correct": True,
-                "message": f"Correto! A letra '{letter}' está em '{current_word}'"
-            })
-        else:
-            return jsonify({
-                "success": True,
-                "letter": letter,
-                "word": current_word,
-                "correct": False,
-                "message": f"A letra '{letter}' não está em '{current_word}'"
-            })
-    except Exception as e:
-        logger.error(f"Erro em check_letter: {e}")
-        return jsonify({"success": False, "error": f"Erro interno: {e}"})
-
-@app.route('/api/validate_word', methods=['POST'])
-def validate_word():
-    """Validar palavra customizada para modo soletração"""
-    try:
-        data = request.get_json()
-        word = data.get('word', '').strip().upper()
-        
-        if not word:
-            return jsonify({"success": False, "message": "Palavra não pode estar vazia"})
-        
-        # Validar se contém apenas letras
-        if not word.isalpha():
-            return jsonify({"success": False, "message": "Use apenas letras de A-Z"})
-        
-        # Validar tamanho
-        if len(word) > 20:
-            return jsonify({"success": False, "message": "Palavra muito longa (máximo 20 letras)"})
-        
-        if len(word) < 2:
-            return jsonify({"success": False, "message": "Palavra muito curta (mínimo 2 letras)"})
-        
-        # Palavra válida - armazenar globalmente para uso posterior
-        global current_word
-        current_word = word
-        
-        return jsonify({
-            "success": True,
-            "word": word,
-            "message": f"Palavra '{word}' validada com sucesso! Clique em 'Iniciar' para começar a soletração."
-        })
-        
-    except Exception as e:
-        logger.error(f"Erro em validate_word: {e}")
-        return jsonify({"success": False, "error": f"Erro interno: {e}"})
-
-@app.route('/api/camera_status')
-def camera_status():
-    """Status da câmera (sempre desabilitada no deploy)"""
-    return jsonify({
-        "available": False,
-        "enabled": False,
-        "message": "Câmera não disponível nesta versão de demonstração"
-    })
-
-@app.route('/api/game_status')
-def game_status():
-    """Status atual do jogo"""
-    return jsonify({
-        "active": game_active,
-        "word": current_word if game_active else "",
-        "mode": current_mode,
-        "score": score,
-        "completed_words": len(words_completed),
-        "recognition_enabled": RECOGNITION_ENABLED
-    })
+    return render_template('statistics.html', stats=stats, soletrando_stats=soletrando_stats)
 
 # ===== ROTAS DE VÍDEO =====
 @app.route('/videos/<letra>')
@@ -368,6 +235,475 @@ def get_video_demo(letra):
             "error": f"Erro interno: {e}"
         })
 
+# ===== ROTA DO JOGO SOLETRANDO =====
+@app.route('/soletrando')
+def soletrando():
+    """Página do jogo Soletrando"""
+    return render_template('soletrando.html')
+
+@app.route('/api/save_soletrando_letter', methods=['POST'])
+def save_soletrando_letter():
+    """API para salvar estatísticas de letra completada no Soletrando"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({"success": False, "error": "Dados não fornecidos"})
+        
+        # Verificar se usuário está logado
+        if 'username' not in session:
+            return jsonify({"success": False, "error": "Usuário não logado"})
+        
+        # Extrair dados
+        letter = data.get('letter', '').upper()
+        word = data.get('word', '').upper()
+        word_position = data.get('position', 0)
+        completion_time = data.get('time', 0)
+        similarity_score = data.get('similarity', None)
+        
+        # Validar dados
+        if not letter or not word or completion_time <= 0:
+            return jsonify({"success": False, "error": "Dados inválidos"})
+        
+        if not DATABASE_AVAILABLE:
+            return jsonify({"success": False, "error": "Sistema de estatísticas não disponível"})
+        
+        # Salvar no banco
+        db = LibrasDatabase()
+        username = session['username']
+        
+        # Buscar ou criar usuário
+        user_result = db.get_user(username)
+        if not user_result:
+            user_id = db.create_user(username)
+        else:
+            user_id = user_result[0]
+        
+        if user_id:
+            # Salvar estatística da letra
+            stat_id = db.save_soletrando_letter(
+                user_id=user_id,
+                letter=letter,
+                word=word,
+                word_position=word_position,
+                completion_time=completion_time,
+                similarity_score=similarity_score
+            )
+            
+            if stat_id:
+                return jsonify({
+                    "success": True,
+                    "message": f"Letra {letter} salva com sucesso",
+                    "stat_id": stat_id
+                })
+            else:
+                return jsonify({"success": False, "error": "Erro ao salvar no banco"})
+        else:
+            return jsonify({"success": False, "error": "Erro ao identificar usuário"})
+    
+    except Exception as e:
+        logger.error(f"Erro ao salvar estatística Soletrando: {e}")
+        return jsonify({"success": False, "error": f"Erro interno: {str(e)}"})
+
+@app.route('/api/get_soletrando_stats')
+def get_soletrando_stats():
+    """API para recuperar estatísticas do Soletrando do usuário"""
+    try:
+        # Verificar se usuário está logado
+        if 'username' not in session:
+            return jsonify({"success": False, "error": "Usuário não logado"})
+        
+        if not DATABASE_AVAILABLE:
+            return jsonify({"success": False, "error": "Sistema de estatísticas não disponível"})
+        
+        db = LibrasDatabase()
+        username = session['username']
+        
+        # Buscar usuário
+        user_result = db.get_user(username)
+        if not user_result:
+            return jsonify({"success": False, "error": "Usuário não encontrado"})
+        
+        user_id = user_result[0]
+        stats = db.get_soletrando_stats(user_id)
+        
+        return jsonify({
+            "success": True,
+            "stats": stats
+        })
+    
+    except Exception as e:
+        logger.error(f"Erro ao recuperar estatísticas Soletrando: {e}")
+        return jsonify({"success": False, "error": f"Erro interno: {str(e)}"})
+
+# ===== MODO DESAFIO =====
+@app.route('/desafio')
+def desafio():
+    """Página do jogo Desafio"""
+    return render_template('desafio.html')
+
+@app.route('/api/get_challenge_words/<level>')
+def get_challenge_words(level):
+    """API para obter palavras do nível de desafio especificado"""
+    try:
+        if not WORDS_AVAILABLE:
+            return jsonify({
+                "success": False, 
+                "error": "Sistema de palavras não disponível",
+                "words": ["CASA", "GATO", "AGUA", "LIVRO", "AMIGO"]
+            })
+        
+        words_map = {
+            'iniciante': palavras_iniciante,
+            'intermediario': palavras,
+            'avancado': palavras_avancado,
+            'expert': palavras_expert
+        }
+        
+        selected_words = words_map.get(level, palavras_iniciante)
+        
+        # Para níveis expert e avançado, processa espaços e hífens automaticamente
+        if level in ['expert', 'avancado']:
+            processed_words = []
+            for word in selected_words:
+                # Quebra frases em palavras individuais para o desafio
+                if level == 'expert':
+                    # Para expert, pega frases completas mas marca espaços/hífens
+                    processed_words.append(word)
+                else:
+                    # Para avançado, pode dividir palavras compostas
+                    processed_words.append(word)
+            selected_words = processed_words
+        
+        return jsonify({
+            "success": True,
+            "words": selected_words,
+            "level": level,
+            "total": len(selected_words)
+        })
+        
+    except Exception as e:
+        logger.error(f"Erro ao buscar palavras do desafio: {e}")
+        return jsonify({
+            "success": False, 
+            "error": f"Erro interno: {str(e)}",
+            "words": ["CASA", "GATO", "AGUA", "LIVRO", "AMIGO"]
+        })
+
+@app.route('/api/save_challenge_result', methods=['POST'])
+def save_challenge_result():
+    """API para salvar resultado do desafio"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({"success": False, "error": "Dados não fornecidos"})
+        
+        # Verificar se usuário está logado
+        if 'username' not in session:
+            return jsonify({"success": False, "error": "Usuário não logado"})
+        
+        if not DATABASE_AVAILABLE:
+            return jsonify({"success": False, "error": "Sistema de banco não disponível"})
+        
+        # Extrair dados
+        level = data.get('level', 'iniciante')
+        words_completed = data.get('words_completed', 0)
+        score = data.get('score', 0)
+        time_taken = data.get('time_taken', 0)
+        
+        # Validar dados
+        if not all([level, isinstance(words_completed, int), isinstance(score, int)]):
+            return jsonify({"success": False, "error": "Dados inválidos fornecidos"})
+        
+        db = LibrasDatabase()
+        username = session['username']
+        
+        # Buscar usuário
+        user_result = db.get_user(username)
+        if not user_result:
+            return jsonify({"success": False, "error": "Usuário não encontrado"})
+        
+        user_id = user_result[0]
+        
+        # Salvar resultado do desafio
+        success = db.save_challenge_result(user_id, level, words_completed, score, time_taken)
+        
+        if success:
+            return jsonify({
+                "success": True, 
+                "message": "Resultado do desafio salvo com sucesso!",
+                "level": level,
+                "words_completed": words_completed,
+                "score": score
+            })
+        else:
+            return jsonify({"success": False, "error": "Erro ao salvar resultado no banco"})
+    
+    except Exception as e:
+        logger.error(f"Erro ao salvar resultado do desafio: {e}")
+        return jsonify({"success": False, "error": f"Erro interno: {str(e)}"})
+
+@app.route('/api/get_challenge_stats')
+def get_challenge_stats():
+    """API para recuperar estatísticas do Desafio do usuário"""
+    try:
+        # Verificar se usuário está logado
+        if 'username' not in session:
+            return jsonify({"success": False, "error": "Usuário não logado"})
+        
+        if not DATABASE_AVAILABLE:
+            return jsonify({"success": False, "error": "Sistema de estatísticas não disponível"})
+        
+        db = LibrasDatabase()
+        username = session['username']
+        
+        # Buscar usuário
+        user_result = db.get_user(username)
+        if not user_result:
+            return jsonify({"success": False, "error": "Usuário não encontrado"})
+        
+        user_id = user_result[0]
+        stats = db.get_challenge_stats(user_id)
+        
+        return jsonify({
+            "success": True,
+            "stats": stats
+        })
+    
+    except Exception as e:
+        logger.error(f"Erro ao recuperar estatísticas do Desafio: {e}")
+        return jsonify({"success": False, "error": f"Erro interno: {str(e)}"})
+
+@app.route('/api/get_challenge_ranking/<level>')
+def get_challenge_ranking(level):
+    """API para obter ranking do desafio por nível"""
+    try:
+        if not DATABASE_AVAILABLE:
+            return jsonify({"success": False, "error": "Sistema de ranking não disponível"})
+        
+        db = LibrasDatabase()
+        ranking = db.get_challenge_ranking(level, limit=10)
+        
+        return jsonify({
+            "success": True,
+            "ranking": ranking,
+            "level": level
+        })
+    
+    except Exception as e:
+        logger.error(f"Erro ao recuperar ranking do desafio: {e}")
+        return jsonify({"success": False, "error": f"Erro interno: {str(e)}"})
+
+# ===== APIs DE MACHINE LEARNING =====
+@app.route('/api/ml/collect_example', methods=['POST'])
+def collect_ml_example():
+    """API para coletar exemplos de gestos para ML"""
+    try:
+        data = request.get_json()
+        
+        if not data or 'letter' not in data or 'landmarks' not in data:
+            return jsonify({"success": False, "error": "Dados insuficientes"})
+        
+        if not ML_SYSTEM_AVAILABLE:
+            return jsonify({"success": False, "error": "Sistema de ML não disponível"})
+        
+        letter = data.get('letter', '').upper()
+        landmarks = data.get('landmarks', [])
+        confidence = data.get('confidence', None)
+        source = data.get('source', 'game')
+        
+        # Obter user_id se logado
+        user_id = None
+        if 'username' in session and DATABASE_AVAILABLE:
+            try:
+                db = LibrasDatabase()
+                user_result = db.get_user(session['username'])
+                if user_result:
+                    user_id = user_result[0]
+            except:
+                pass
+        
+        # Coletar exemplo
+        example_id = ml_system.collect_gesture_example(
+            letter=letter,
+            landmarks=landmarks,
+            user_id=user_id,
+            confidence=confidence,
+            source=source
+        )
+        
+        if example_id:
+            return jsonify({
+                "success": True,
+                "message": f"Exemplo coletado para letra {letter}",
+                "example_id": example_id
+            })
+        else:
+            return jsonify({"success": False, "error": "Erro ao coletar exemplo"})
+    
+    except Exception as e:
+        logger.error(f"Erro ao coletar exemplo ML: {e}")
+        return jsonify({"success": False, "error": f"Erro interno: {str(e)}"})
+
+@app.route('/api/ml/predict', methods=['POST'])
+def ml_predict():
+    """API para predição usando modelos ML"""
+    try:
+        data = request.get_json()
+        
+        if not data or 'landmarks' not in data:
+            return jsonify({"success": False, "error": "Landmarks não fornecidos"})
+        
+        if not ML_SYSTEM_AVAILABLE:
+            return jsonify({"success": False, "error": "Sistema de ML não disponível"})
+        
+        landmarks = data.get('landmarks', [])
+        return_probabilities = data.get('return_probabilities', False)
+        
+        # Fazer predição
+        if return_probabilities:
+            letter, confidence, all_predictions = ml_system.predict_letter(
+                landmarks, return_probabilities=True
+            )
+            
+            return jsonify({
+                "success": True,
+                "predicted_letter": letter,
+                "confidence": float(confidence) if confidence else 0.0,
+                "all_predictions": {k: float(v) for k, v in all_predictions.items()}
+            })
+        else:
+            letter, confidence = ml_system.predict_letter(landmarks)
+            
+            return jsonify({
+                "success": True,
+                "predicted_letter": letter,
+                "confidence": float(confidence) if confidence else 0.0
+            })
+    
+    except Exception as e:
+        logger.error(f"Erro na predição ML: {e}")
+        return jsonify({"success": False, "error": f"Erro interno: {str(e)}"})
+
+@app.route('/api/ml/feedback', methods=['POST'])
+def ml_feedback():
+    """API para feedback de usuário sobre predições"""
+    try:
+        data = request.get_json()
+        
+        required_fields = ['predicted_letter', 'actual_letter', 'landmarks']
+        if not data or not all(field in data for field in required_fields):
+            return jsonify({"success": False, "error": "Dados insuficientes"})
+        
+        if not ML_SYSTEM_AVAILABLE:
+            return jsonify({"success": False, "error": "Sistema de ML não disponível"})
+        
+        # Obter user_id se logado
+        user_id = None
+        if 'username' in session and DATABASE_AVAILABLE:
+            try:
+                db = LibrasDatabase()
+                user_result = db.get_user(session['username'])
+                if user_result:
+                    user_id = user_result[0]
+            except:
+                pass
+        
+        predicted_letter = data.get('predicted_letter', '').upper()
+        actual_letter = data.get('actual_letter', '').upper()
+        landmarks = data.get('landmarks', [])
+        confidence = data.get('confidence', None)
+        feedback_type = data.get('feedback_type', 'correction')
+        
+        # Registrar feedback
+        feedback_id = ml_system.add_user_feedback(
+            user_id=user_id,
+            predicted_letter=predicted_letter,
+            actual_letter=actual_letter,
+            confidence=confidence,
+            landmarks=landmarks,
+            feedback_type=feedback_type
+        )
+        
+        if feedback_id:
+            return jsonify({
+                "success": True,
+                "message": f"Feedback registrado: {predicted_letter} -> {actual_letter}",
+                "feedback_id": feedback_id
+            })
+        else:
+            return jsonify({"success": False, "error": "Erro ao registrar feedback"})
+    
+    except Exception as e:
+        logger.error(f"Erro ao registrar feedback ML: {e}")
+        return jsonify({"success": False, "error": f"Erro interno: {str(e)}"})
+
+@app.route('/api/ml/train/<letter>', methods=['POST'])
+def train_letter_model(letter):
+    """API para treinar modelo de uma letra específica"""
+    try:
+        if not ML_SYSTEM_AVAILABLE:
+            return jsonify({"success": False, "error": "Sistema de ML não disponível"})
+        
+        letter = letter.upper()
+        
+        # Treinar modelo
+        success = ml_system.train_letter_model(letter)
+        
+        if success:
+            return jsonify({
+                "success": True,
+                "message": f"Modelo da letra {letter} treinado com sucesso"
+            })
+        else:
+            return jsonify({"success": False, "error": f"Erro no treinamento do modelo {letter}"})
+    
+    except Exception as e:
+        logger.error(f"Erro ao treinar modelo {letter}: {e}")
+        return jsonify({"success": False, "error": f"Erro interno: {str(e)}"})
+
+@app.route('/api/ml/train_all', methods=['POST'])
+def train_all_models():
+    """API para treinar todos os modelos"""
+    try:
+        if not ML_SYSTEM_AVAILABLE:
+            return jsonify({"success": False, "error": "Sistema de ML não disponível"})
+        
+        data = request.get_json() or {}
+        min_examples = data.get('min_examples', 10)
+        
+        # Treinar todos os modelos
+        trained_count = ml_system.train_all_models(min_examples=min_examples)
+        
+        return jsonify({
+            "success": True,
+            "message": f"{trained_count} modelos treinados com sucesso",
+            "trained_count": trained_count
+        })
+    
+    except Exception as e:
+        logger.error(f"Erro ao treinar todos os modelos: {e}")
+        return jsonify({"success": False, "error": f"Erro interno: {str(e)}"})
+
+@app.route('/api/ml/stats')
+def ml_stats():
+    """API para estatísticas dos modelos ML"""
+    try:
+        if not ML_SYSTEM_AVAILABLE:
+            return jsonify({"success": False, "error": "Sistema de ML não disponível"})
+        
+        stats = ml_system.get_model_stats()
+        
+        return jsonify({
+            "success": True,
+            "stats": stats
+        })
+    
+    except Exception as e:
+        logger.error(f"Erro ao obter estatísticas ML: {e}")
+        return jsonify({"success": False, "error": f"Erro interno: {str(e)}"})
+
 @app.route('/api/process_frame', methods=['POST'])
 def process_frame():
     """Processar frame da câmera para reconhecimento LIBRAS"""
@@ -390,12 +726,10 @@ def process_frame():
         # Simulate letter recognition for now
         # In a real implementation, this would use a trained ML model
         recognized_letter = simulate_letter_recognition(image_data)
-        confidence = simulate_confidence()
         
         return jsonify({
             "success": True,
             "letter": recognized_letter,
-            "confidence": confidence,
             "timestamp": time.time()
         })
         
@@ -418,80 +752,167 @@ def simulate_letter_recognition(image_data):
     timestamp = int(time.time() * 10) % len(letters)
     return letters[timestamp]
 
-def simulate_confidence():
-    """Simular nível de confiança do reconhecimento"""
-    # Simular confiança entre 60% e 95%
-    return random.uniform(0.6, 0.95)
-
-@app.route('/api/save_game_result', methods=['POST'])
-def save_game_result():
-    """Salvar resultado do jogo no banco de dados"""
+# ===== FUNÇÕES DE RECONHECIMENTO =====
+def recognize_landmarks_against_saved_gestures(landmarks):
+    """
+    Reconhece landmarks comparando com gestos salvos
+    
+    Args:
+        landmarks: Lista de 21 pontos com coordenadas x, y, z
+        
+    Returns:
+        Dict com letra e similaridade ou None se não reconhecido
+    """
     try:
-        if 'username' not in session:
-            return jsonify({"success": False, "error": "Usuário não logado"}), 401
+        if not GESTURE_MANAGER_AVAILABLE or not gesture_manager:
+            return None
         
-        data = request.get_json()
-        username = session['username']
+        saved_gestures = gesture_manager.get_all_gestures()
+        if not saved_gestures:
+            return None
         
-        # Dados do resultado
-        mode = data.get('mode', '')
-        difficulty = data.get('difficulty', '')
-        word = data.get('word', '')
-        completed = data.get('completed', False)
-        time_spent = data.get('time_spent', 0)
-        total_time = data.get('total_time', 0)
-        letters_completed = data.get('letters_completed', 0)
-        total_letters = data.get('total_letters', 0)
-        accuracy = data.get('accuracy', 0)
+        best_match = None
+        highest_similarity = 0
+        similarity_threshold = 0.50  # 50% de similaridade mínima
+        detailed_results = []
         
-        logger.info(f"Salvando resultado: {username} - {mode} - {difficulty} - {word}")
-        
-        if DATABASE_AVAILABLE:
-            try:
-                # Importar função de salvamento do database.py
-                from database import save_game_session
-                
-                result = save_game_session(
-                    username=username,
-                    mode=mode,
-                    difficulty=difficulty,
-                    word=word,
-                    completed=completed,
-                    time_spent=time_spent,
-                    total_time=total_time,
-                    letters_completed=letters_completed,
-                    total_letters=total_letters,
-                    accuracy=accuracy
-                )
-                
-                if result:
-                    return jsonify({
-                        "success": True,
-                        "message": "Resultado salvo com sucesso",
-                        "data": {
-                            "username": username,
-                            "mode": mode,
-                            "difficulty": difficulty,
-                            "completed": completed
-                        }
-                    })
-                else:
-                    return jsonify({"success": False, "error": "Erro ao salvar no banco"})
-                    
-            except Exception as db_error:
-                logger.error(f"Erro no banco de dados: {db_error}")
-                return jsonify({"success": False, "error": f"Erro no banco: {db_error}"})
-        else:
-            logger.info("Banco não disponível - resultado não salvo")
-            return jsonify({
-                "success": True,
-                "message": "Resultado processado (banco não disponível)",
-                "data": {"username": username, "mode": mode}
+        for letter, gesture_data in saved_gestures.items():
+            saved_landmarks = gesture_data['landmarks']
+            analysis_result = calculate_landmark_similarity(landmarks, saved_landmarks)
+            
+            # Extrair similaridade do resultado detalhado
+            similarity = analysis_result["similarity"] if isinstance(analysis_result, dict) else analysis_result
+            
+            # Salvar resultado detalhado para debug
+            detailed_results.append({
+                'letter': letter,
+                'similarity': similarity,
+                'analysis': analysis_result if isinstance(analysis_result, dict) else None
             })
             
+            if similarity > highest_similarity and similarity > similarity_threshold:
+                highest_similarity = similarity
+                best_match = {
+                    'letter': letter,
+                    'similarity': similarity,
+                    'quality': gesture_data['quality'],
+                    'detailed_analysis': analysis_result if isinstance(analysis_result, dict) else None,
+                    'all_comparisons': detailed_results  # Para debug completo
+                }
+        
+        return best_match
+        
     except Exception as e:
-        logger.error(f"Erro em save_game_result: {e}")
-        return jsonify({"success": False, "error": f"Erro interno: {e}"})
+        logger.error(f"Erro no reconhecimento: {e}")
+        return None
+
+def calculate_landmark_similarity(landmarks1, landmarks2):
+    """
+    Calcula similaridade detalhada entre dois conjuntos de landmarks
+    
+    Args:
+        landmarks1: Primeiro conjunto de landmarks
+        landmarks2: Segundo conjunto de landmarks
+        
+    Returns:
+        dict: Resultado detalhado com similaridade e análise por pontos
+    """
+    try:
+        if len(landmarks1) != 21 or len(landmarks2) != 21:
+            return {"similarity": 0.0, "point_analysis": [], "total_distance": float('inf')}
+        
+        point_analysis = []
+        total_distance = 0.0
+        weighted_distance = 0.0
+        
+        # Pesos para diferentes pontos da mão (pontos mais importantes têm peso maior)
+        point_weights = {
+            0: 1.5,   # Pulso (muito importante para orientação)
+            4: 1.3,   # Ponta do polegar
+            8: 1.3,   # Ponta do indicador
+            12: 1.3,  # Ponta do médio
+            16: 1.3,  # Ponta do anelar
+            20: 1.3,  # Ponta do mindinho
+            # Articulações importantes
+            5: 1.2, 9: 1.2, 13: 1.2, 17: 1.2,  # Base dos dedos
+            # Outras articulações
+            1: 1.0, 2: 1.0, 3: 1.0,  # Polegar
+            6: 1.0, 7: 1.0,          # Indicador
+            10: 1.0, 11: 1.0,        # Médio
+            14: 1.0, 15: 1.0,        # Anelar
+            18: 1.0, 19: 1.0         # Mindinho
+        }
+        
+        # Analisar cada ponto individualmente
+        for i in range(21):
+            p1 = landmarks1[i]
+            p2 = landmarks2[i]
+            weight = point_weights.get(i, 1.0)
+            
+            # Calcular distância euclidiana 3D
+            distance_3d = ((p1['x'] - p2['x']) ** 2 + 
+                          (p1['y'] - p2['y']) ** 2 + 
+                          (p1['z'] - p2['z']) ** 2) ** 0.5
+            
+            # Calcular distância 2D (para gestos planos)
+            distance_2d = ((p1['x'] - p2['x']) ** 2 + 
+                          (p1['y'] - p2['y']) ** 2) ** 0.5
+            
+            # Usar a menor distância (mais tolerante)
+            distance = min(distance_3d, distance_2d * 1.1)  # Leve penalidade para 2D
+            
+            # Classificar qualidade do match do ponto
+            point_quality = "excelente" if distance < 0.05 else \
+                           "bom" if distance < 0.1 else \
+                           "aceitável" if distance < 0.2 else \
+                           "ruim"
+            
+            point_analysis.append({
+                "point_id": i,
+                "distance": distance,
+                "distance_3d": distance_3d,
+                "distance_2d": distance_2d,
+                "weight": weight,
+                "quality": point_quality,
+                "coordinates_saved": {"x": p2['x'], "y": p2['y'], "z": p2['z']},
+                "coordinates_current": {"x": p1['x'], "y": p1['y'], "z": p1['z']}
+            })
+            
+            total_distance += distance
+            weighted_distance += distance * weight
+        
+        # Calcular similaridades
+        avg_distance = total_distance / 21
+        weighted_avg_distance = weighted_distance / sum(point_weights.values())
+        
+        # Converter para similaridade (0-1)
+        max_distance = 0.8  # Distância máxima considerada (ajustado empiricamente)
+        similarity = max(0.0, 1.0 - (weighted_avg_distance / max_distance))
+        
+        # Análise estatística dos pontos
+        excellent_points = sum(1 for p in point_analysis if p["quality"] == "excelente")
+        good_points = sum(1 for p in point_analysis if p["quality"] == "bom")
+        acceptable_points = sum(1 for p in point_analysis if p["quality"] == "aceitável")
+        bad_points = sum(1 for p in point_analysis if p["quality"] == "ruim")
+        
+        return {
+            "similarity": similarity,
+            "point_analysis": point_analysis,
+            "total_distance": total_distance,
+            "avg_distance": avg_distance,
+            "weighted_avg_distance": weighted_avg_distance,
+            "statistics": {
+                "excellent_points": excellent_points,
+                "good_points": good_points,
+                "acceptable_points": acceptable_points,
+                "bad_points": bad_points,
+                "match_percentage": (excellent_points + good_points) / 21 * 100
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Erro no cálculo de similaridade: {e}")
+        return {"similarity": 0.0, "point_analysis": [], "total_distance": float('inf')}
 
 # ===== ROTAS DE SISTEMA =====
 @app.route('/api/logout', methods=['POST'])
@@ -501,6 +922,261 @@ def logout():
     session.clear()
     logger.info(f"Usuário deslogado: {username}")
     return jsonify({"success": True, "message": "Logout realizado com sucesso"})
+
+# ===== APIs DE GESTÃO DE GESTOS =====
+@app.route('/api/save_gesture', methods=['POST'])
+def save_gesture():
+    """Salva um gesto capturado pelo administrador"""
+    try:
+        if not GESTURE_MANAGER_AVAILABLE or not gesture_manager:
+            return jsonify({"success": False, "error": "Sistema de gestos não disponível"}), 500
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({"success": False, "error": "Dados não fornecidos"}), 400
+        
+        letter = data.get('letter', '').upper()
+        landmarks = data.get('landmarks', [])
+        quality = data.get('quality', 0)
+        
+        # Validar dados
+        if not letter or len(letter) != 1:
+            return jsonify({"success": False, "error": "Letra inválida"}), 400
+        
+        if not landmarks or len(landmarks) != 21:
+            return jsonify({"success": False, "error": "Landmarks inválidos - deve ter 21 pontos"}), 400
+        
+        if not 0 <= quality <= 100:
+            return jsonify({"success": False, "error": "Qualidade deve estar entre 0 e 100"}), 400
+        
+        # Salvar gesto
+        success = gesture_manager.save_gesture(letter, landmarks, quality)
+        
+        if success:
+            logger.info(f"Gesto da letra {letter} salvo com qualidade {quality}%")
+            return jsonify({"success": True, "message": f"Gesto da letra {letter} salvo com sucesso"})
+        else:
+            return jsonify({"success": False, "error": "Erro ao salvar gesto"}), 500
+            
+    except Exception as e:
+        logger.error(f"Erro ao salvar gesto: {e}")
+        return jsonify({"success": False, "error": f"Erro interno: {e}"}), 500
+
+@app.route('/api/get_gestures', methods=['GET'])
+def get_gestures():
+    """Recupera todos os gestos salvos"""
+    try:
+        if not GESTURE_MANAGER_AVAILABLE or not gesture_manager:
+            return jsonify({})
+        
+        gestures = gesture_manager.get_all_gestures()
+        return jsonify(gestures)
+        
+    except Exception as e:
+        logger.error(f"Erro ao recuperar gestos: {e}")
+        return jsonify({}), 500
+
+@app.route('/api/get_gesture/<letter>', methods=['GET'])
+def get_gesture(letter):
+    """Recupera um gesto específico"""
+    try:
+        if not GESTURE_MANAGER_AVAILABLE or not gesture_manager:
+            return jsonify({"success": False, "error": "Sistema de gestos não disponível"}), 500
+        
+        gesture = gesture_manager.get_gesture(letter.upper())
+        
+        if gesture:
+            return jsonify({"success": True, "gesture": gesture})
+        else:
+            return jsonify({"success": False, "error": "Gesto não encontrado"}), 404
+            
+    except Exception as e:
+        logger.error(f"Erro ao recuperar gesto da letra {letter}: {e}")
+        return jsonify({"success": False, "error": f"Erro interno: {e}"}), 500
+
+@app.route('/api/delete_gesture/<letter>', methods=['DELETE'])
+def delete_gesture(letter):
+    """Remove um gesto específico"""
+    try:
+        if not GESTURE_MANAGER_AVAILABLE or not gesture_manager:
+            return jsonify({"success": False, "error": "Sistema de gestos não disponível"}), 500
+        
+        success = gesture_manager.delete_gesture(letter.upper())
+        
+        if success:
+            logger.info(f"Gesto da letra {letter} removido")
+            return jsonify({"success": True, "message": f"Gesto da letra {letter} removido"})
+        else:
+            return jsonify({"success": False, "error": "Gesto não encontrado"}), 404
+            
+    except Exception as e:
+        logger.error(f"Erro ao remover gesto da letra {letter}: {e}")
+        return jsonify({"success": False, "error": f"Erro interno: {e}"}), 500
+
+@app.route('/api/recognize_gesture', methods=['POST'])
+def recognize_gesture():
+    """Reconhece um gesto usando sistema híbrido (tradicional + ML)"""
+    try:
+        if not GESTURE_MANAGER_AVAILABLE or not gesture_manager:
+            return jsonify({"success": False, "error": "Sistema de gestos não disponível"}), 500
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({"success": False, "error": "Dados não fornecidos"}), 400
+        
+        landmarks = data.get('landmarks', [])
+        collect_for_ml = data.get('collect_for_ml', True)  # Coletar para ML por padrão
+        
+        if not landmarks or len(landmarks) != 21:
+            return jsonify({"success": False, "error": "Landmarks inválidos"}), 400
+        
+        # Reconhecimento híbrido
+        if ML_SYSTEM_AVAILABLE and ml_system:
+            result = gesture_manager.recognize_gesture_hybrid(landmarks, ml_system)
+        else:
+            # Fallback para reconhecimento tradicional usando método híbrido sem ML
+            result = gesture_manager.recognize_gesture_hybrid(landmarks, None)
+            if not result:
+                result = {
+                    'traditional': None,
+                    'ml': None,
+                    'final': None,
+                    'confidence': 0,
+                    'method': 'traditional'
+                }
+        
+        if result['final']:
+            # Atualizar estatísticas
+            gesture_manager.update_recognition_stats(result['final'])
+            
+            # Coletar exemplo para ML (se reconhecimento foi bem-sucedido e confiança alta)
+            if collect_for_ml and ML_SYSTEM_AVAILABLE and ml_system and result['confidence'] > 0.7:
+                try:
+                    # Obter user_id se logado
+                    user_id = None
+                    if 'username' in session and DATABASE_AVAILABLE:
+                        try:
+                            db = LibrasDatabase()
+                            user_result = db.get_user(session['username'])
+                            if user_result:
+                                user_id = user_result[0]
+                        except:
+                            pass
+                    
+                    ml_system.collect_gesture_example(
+                        letter=result['final'],
+                        landmarks=landmarks,
+                        user_id=user_id,
+                        confidence=result['confidence'],
+                        source='recognition'
+                    )
+                except Exception as e:
+                    logger.warning(f"Erro ao coletar exemplo ML: {e}")
+            
+            return jsonify({
+                "success": True, 
+                "result": {
+                    "letter": result['final'],
+                    "similarity": result['confidence'],
+                    "method": result['method'],
+                    "detailed_analysis": result.get('detailed_analysis', {})
+                }
+            })
+        else:
+            return jsonify({"success": False, "message": "Nenhuma letra reconhecida"})
+            
+    except Exception as e:
+        logger.error(f"Erro ao reconhecer gesto: {e}")
+        return jsonify({"success": False, "error": f"Erro interno: {e}"}), 500
+
+@app.route('/api/export_gestures', methods=['GET'])
+def export_gestures():
+    """Exporta todos os gestos para backup"""
+    try:
+        if not GESTURE_MANAGER_AVAILABLE or not gesture_manager:
+            return jsonify({"error": "Sistema de gestos não disponível"}), 500
+        
+        export_data = gesture_manager.export_gestures()
+        
+        # Criar resposta como arquivo JSON
+        response = app.response_class(
+            response=json.dumps(export_data, indent=2),
+            status=200,
+            mimetype='application/json',
+            headers={'Content-Disposition': f'attachment; filename=libras_gestures_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'}
+        )
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Erro ao exportar gestos: {e}")
+        return jsonify({"error": f"Erro interno: {e}"}), 500
+
+@app.route('/api/gesture_analytics', methods=['GET'])
+def gesture_analytics():
+    """Retorna estatísticas de uso dos gestos"""
+    try:
+        if not GESTURE_MANAGER_AVAILABLE or not gesture_manager:
+            return jsonify({})
+        
+        analytics = gesture_manager.get_analytics()
+        return jsonify(analytics)
+        
+    except Exception as e:
+        logger.error(f"Erro ao recuperar estatísticas: {e}")
+        return jsonify({}), 500
+
+@app.route('/debug-recognition')
+def debug_recognition():
+    """Página de debug para problemas de reconhecimento"""
+    return render_template('debug-recognition.html')
+
+@app.route('/fix-recognition')
+def fix_recognition():
+    """Página para ajustar configurações de reconhecimento"""
+    return render_template('fix-recognition.html')
+
+@app.route('/test-game-integration')
+def test_game_integration():
+    """Página para testar integração jogo-reconhecedor"""
+    return render_template('test-game-integration.html')
+
+@app.route('/system-updated')
+def system_updated():
+    """Página de confirmação de atualizações do sistema"""
+    return render_template('system-updated.html')
+
+@app.route('/debug-isolation')
+def debug_isolation():
+    """Página de debug para isolar problema de reconhecimento"""
+    return render_template('debug-isolation.html')
+
+@app.route('/test-apis')
+def test_apis():
+    """Página de teste das APIs"""
+    return render_template('test-apis.html')
+
+@app.route('/test-optimized')
+def test_optimized():
+    """Página de teste do reconhecedor otimizado"""
+    return render_template('test-optimized.html')
+
+@app.route('/test-simple')
+def test_simple():
+    """Página de teste simples"""
+    return render_template('test-simple.html')
+
+@app.route('/static/dados_libras.csv')
+def serve_csv():
+    """Serve o arquivo CSV de dados de libras"""
+    try:
+        return send_file('dados_libras.csv', 
+                        mimetype='text/csv',
+                        as_attachment=False,
+                        download_name='dados_libras.csv')
+    except Exception as e:
+        logger.error(f"Erro ao servir CSV: {e}")
+        abort(404)
 
 @app.route('/health')
 def health_check():
