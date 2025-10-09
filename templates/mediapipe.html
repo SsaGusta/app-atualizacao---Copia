@@ -55,6 +55,14 @@
                         <div class="mt-3">
                             <strong>Letra Detectada:</strong> <span id="detectedLetter" style="font-size: 1.2em; color: #28a745; transition: all 0.2s ease-in-out;" title="Passe o mouse para ver detalhes">-</span>
                         </div>
+                        <div class="mt-2" id="gestureStatus" style="font-size: 0.9em;">
+                            <strong>Gestos:</strong> Carregando...
+                        </div>
+                        <div class="mt-2">
+                            <button id="refreshGesturesBtn" class="btn btn-sm btn-outline-primary" onclick="window.handTracker?.refreshGestures()" title="Recarregar gestos do servidor">
+                                <i class="fas fa-sync-alt"></i> Atualizar Gestos
+                            </button>
+                        </div>
                         <div class="mt-2" id="recognitionDetails" style="font-size: 0.85em; color: #6c757d; display: none;">
                             <div><strong>Análise:</strong> <span id="analysisInfo">-</span></div>
                         </div>

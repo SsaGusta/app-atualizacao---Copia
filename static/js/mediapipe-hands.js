@@ -71,6 +71,10 @@ class HandTracker {
     async loadSavedGestures() {
         try {
             console.log('📥 Carregando gestos salvos...');
+            
+            // Primeiro verificar informações de sincronização
+            await this.checkGestureSync();
+            
             const response = await fetch('/api/get_gestures');
             
             if (response.ok) {
@@ -80,16 +84,99 @@ class HandTracker {
                 
                 if (gestureCount > 0) {
                     console.log('📚 Letras disponíveis:', Object.keys(this.savedGestures).join(', '));
+                    
+                    // Mostrar informações na interface
+                    const statusElement = document.getElementById('gestureStatus');
+                    if (statusElement) {
+                        statusElement.innerHTML = `<strong style="color: #28a745;">Gestos carregados:</strong> ${gestureCount} letras (${Object.keys(this.savedGestures).join(', ')})`;
+                    }
+                    
+                    // Verificar se há gestos de qualidade baixa
+                    this.checkGestureQuality();
                 } else {
                     console.log('⚠️ Nenhum gesto salvo encontrado. Vá para /admin para capturar gestos.');
+                    const statusElement = document.getElementById('gestureStatus');
+                    if (statusElement) {
+                        statusElement.innerHTML = '<strong style="color: #dc3545;">Atenção:</strong> Nenhum gesto salvo encontrado. <a href="/admin">Capture gestos aqui</a>';
+                    }
                 }
             } else {
                 console.warn('⚠️ Não foi possível carregar gestos salvos');
                 this.savedGestures = {};
+                const statusElement = document.getElementById('gestureStatus');
+                if (statusElement) {
+                    statusElement.innerHTML = '<strong style="color: #dc3545;">Erro:</strong> Não foi possível carregar gestos salvos';
+                }
             }
         } catch (error) {
             console.error('❌ Erro ao carregar gestos:', error);
             this.savedGestures = {};
+            const statusElement = document.getElementById('gestureStatus');
+            if (statusElement) {
+                statusElement.innerHTML = '<strong style="color: #dc3545;">Erro:</strong> Falha na conexão com o servidor';
+            }
+        }
+    }
+    
+    async checkGestureSync() {
+        // Verifica informações de sincronização dos gestos
+        try {
+            const response = await fetch('/api/gesture_sync_info');
+            if (response.ok) {
+                const syncInfo = await response.json();
+                console.log('📊 Info de sincronização:', syncInfo);
+                
+                // Log estatísticas
+                console.log(`📈 Progresso: ${syncInfo.completion_percentage?.toFixed(1)}% do alfabeto capturado`);
+                console.log(`🎯 Qualidade: ${syncInfo.quality_distribution?.high_quality || 0} alta, ${syncInfo.quality_distribution?.medium_quality || 0} média, ${syncInfo.quality_distribution?.low_quality || 0} baixa`);
+                
+                // Mostrar letras faltantes
+                if (syncInfo.letters_without_gestures && syncInfo.letters_without_gestures.length > 0) {
+                    console.log('⚠️ Letras não capturadas:', syncInfo.letters_without_gestures.join(', '));
+                }
+            }
+        } catch (error) {
+            console.warn('⚠️ Não foi possível verificar sincronização:', error);
+        }
+    }
+    
+    checkGestureQuality() {
+        // Verifica e alerta sobre gestos de baixa qualidade
+        let lowQualityGestures = [];
+        
+        for (const [letter, gestureData] of Object.entries(this.savedGestures)) {
+            if (gestureData.quality < 70) {
+                lowQualityGestures.push(`${letter} (${gestureData.quality}%)`);
+            }
+        }
+        
+        if (lowQualityGestures.length > 0) {
+            console.warn('⚠️ Gestos de baixa qualidade encontrados:', lowQualityGestures.join(', '));
+            console.warn('💡 Considere recapturar estes gestos na área de admin para melhor reconhecimento');
+        }
+    }
+    
+    async refreshGestures() {
+        // Força o recarregamento dos gestos
+        try {
+            console.log('🔄 Recarregando gestos...');
+            const response = await fetch('/api/refresh_gestures', { method: 'POST' });
+            
+            if (response.ok) {
+                const result = await response.json();
+                console.log('✅ Gestos recarregados:', result);
+                
+                // Recarregar gestos na interface
+                await this.loadSavedGestures();
+                
+                return true;
+            } else {
+                console.error('❌ Erro ao recarregar gestos');
+                return false;
+            }
+        } catch (error) {
+            console.error('❌ Erro ao recarregar gestos:', error);
+            return false;
         }
     }
     
@@ -283,9 +370,15 @@ class HandTracker {
         try {
             // Verificar se temos gestos salvos
             if (Object.keys(this.savedGestures).length === 0) {
-                // console.log('⚠️ Nenhum gesto salvo disponível para reconhecimento');
+                console.log('⚠️ Nenhum gesto salvo disponível para reconhecimento');
+                this.updateDetectedLetter('-', null);
                 return;
             }
+            
+            console.log('🔍 Enviando landmarks para reconhecimento...', {
+                numLandmarks: landmarks.length,
+                gesturesSalvos: Object.keys(this.savedGestures).length
+            });
             
             const response = await fetch('/api/recognize_gesture', {
                 method: 'POST',
@@ -297,8 +390,12 @@ class HandTracker {
                 })
             });
             
+            console.log('📡 Resposta da API:', response.status, response.statusText);
+            
             if (response.ok) {
                 const data = await response.json();
+                console.log('📦 Dados recebidos:', data);
+                
                 if (data.success && data.result) {
                     const result = data.result;
                     
@@ -306,6 +403,7 @@ class HandTracker {
                     console.log('🎯 Reconhecimento detalhado:');
                     console.log(`📝 Letra: ${result.letter}`);
                     console.log(`📊 Similaridade: ${(result.similarity * 100).toFixed(1)}%`);
+                    console.log(`🔧 Método: ${result.method || 'traditional'}`);
                     
                     // Se houver análise detalhada, mostrar estatísticas
                     if (result.detailed_analysis && result.detailed_analysis.statistics) {
@@ -334,13 +432,48 @@ class HandTracker {
                     // Armazenar análise detalhada para visualização
                     this.lastDetailedAnalysis = result.detailed_analysis;
                 } else {
+                    console.log('❌ API retornou sem resultado de reconhecimento');
                     this.updateDetectedLetter('-');
                 }
             } else {
-                console.error('❌ Erro na API de reconhecimento:', response.status);
+                console.error(`❌ Erro HTTP ${response.status}:`, response.statusText);
+                try {
+                    const errorData = await response.text();
+                    console.error('Detalhes do erro:', errorData);
+                } catch (e) {
+                    console.error('Não foi possível ler detalhes do erro');
+                }
+                this.updateDetectedLetter('-');
+                
+                // Mostrar erro na interface temporariamente
+                const statusElement = document.getElementById('gestureStatus');
+                if (statusElement) {
+                    const originalContent = statusElement.innerHTML;
+                    statusElement.innerHTML = `<strong style="color: #dc3545;">Erro na API:</strong> HTTP ${response.status}`;
+                    setTimeout(() => {
+                        statusElement.innerHTML = originalContent;
+                    }, 3000);
+                }
             }
         } catch (error) {
-            console.error('❌ Erro no reconhecimento:', error);
+            console.error('❌ Erro na conexão com API:', error);
+            
+            // Verificar tipo de erro
+            if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                console.error('💡 Possível causa: Servidor não está rodando ou problema de CORS');
+            }
+            
+            this.updateDetectedLetter('-');
+            
+            // Mostrar erro na interface temporariamente
+            const statusElement = document.getElementById('gestureStatus');
+            if (statusElement) {
+                const originalContent = statusElement.innerHTML;
+                statusElement.innerHTML = `<strong style="color: #dc3545;">Erro de conexão:</strong> ${error.message}`;
+                setTimeout(() => {
+                    statusElement.innerHTML = originalContent;
+                }, 5000);
+            }
         }
     }
     
