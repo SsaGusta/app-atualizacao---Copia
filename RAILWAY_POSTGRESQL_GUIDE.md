@@ -2,12 +2,13 @@
 
 ## ❌ **PROBLEMA IDENTIFICADO**
 
-O Railway usa **sistema de arquivos efêmero**:
+O Railway usa **sistema de arquivos efêmero** + problemas de build:
 - ✅ **Local**: Bancos SQLite funcionam perfeitamente
 - ❌ **Railway**: Arquivos `.db` são perdidos a cada restart/redeploy
-- 🔄 **Resultado**: Dados salvos desaparecem
+- ⚠️ **Build Error**: Python 3.12 sem distutils causa falhas
+- 🔄 **Resultado**: Dados salvos desaparecem + deploy falha
 
-## ✅ **SOLUÇÃO: POSTGRESQL**
+## ✅ **SOLUÇÃO: POSTGRESQL + BUILD FIX**
 
 ### **Passo 1: Configurar PostgreSQL no Railway**
 
@@ -30,53 +31,61 @@ No Railway, adicione:
 ```
 DATABASE_URL=postgresql://user:password@host:port/database
 RAILWAY_ENVIRONMENT=production
+PYTHON_VERSION=3.11.6
 ```
 
-### **Passo 3: Atualizar Código**
+### **Passo 3: Fix de Build - Requirements Simplificado**
 
-✅ **Arquivos já criados:**
-- `database_postgres.py` - Database híbrido
-- `gesture_manager_hybrid.py` - Gesture manager híbrido  
-- `app_hybrid.py` - App que detecta ambiente automaticamente
-- `requirements.txt` - Atualizado com psycopg2
+⚠️ **PROBLEMA**: scikit-learn + numpy causam erro de build no Railway  
+✅ **SOLUÇÃO**: Deploy em 2 fases
 
-### **Passo 4: Deploy**
+**Fase 1 - Deploy Básico (Funcional):**
+```
+# requirements.txt (atual - apenas essenciais)
+Flask==2.3.3
+Flask-Session==0.5.0
+Flask-CORS==4.0.0
+gunicorn==21.2.0
+python-dotenv==1.0.0
+requests==2.31.0
+psycopg2-binary==2.9.7
+```
 
-1. **Substituir app.py**
-   ```bash
-   mv app.py app_sqlite.py
-   mv app_hybrid.py app.py
-   ```
+**Fase 2 - ML Opcional (se necessário):**
+```
+# requirements_full.txt (com ML)
++ scikit-learn==1.3.0
++ joblib==1.3.2
++ numpy==1.24.3
++ Pillow==10.0.0
+```
 
-2. **Substituir gesture_manager.py**
-   ```bash
-   mv gesture_manager.py gesture_manager_sqlite.py
-   mv gesture_manager_hybrid.py gesture_manager.py
-   ```
+### **Passo 4: Deploy Imediato**
 
-3. **Substituir database.py**
-   ```bash
-   mv database.py database_sqlite.py
-   mv database_postgres.py database.py
-   ```
+✅ **Status atual**: App funcional sem ML
+- ✅ Reconhecimento tradicional de gestos
+- ✅ PostgreSQL para persistência
+- ✅ Todos os jogos funcionando
+- ⏸️ ML desabilitado temporariamente
 
-4. **Commit e Push**
-   ```bash
-   git add .
-   git commit -m "Add PostgreSQL support for Railway deploy"
-   git push
-   ```
+**Deploy agora:**
+```bash
+git add .
+git commit -m "Fix Railway build - PostgreSQL + simplified requirements"
+git push
+```
 
 ### **Passo 5: Verificar Deploy**
 
 1. **Logs do Railway**
-   - Verifique se aparece: `🚀 Usando PostgreSQL (Produção)`
-   - Sem erros de conexão
+   - ✅ Build successful
+   - ✅ `🚀 Usando PostgreSQL (Produção)`
+   - ⚠️ `Aviso: Sistema de ML não disponível`
 
 2. **Testar Funcionalidades**
-   - Capturar gestos no admin
-   - Jogar no modo Desafio
-   - Verificar se dados persistem após restart
+   - ✅ Capturar gestos no admin
+   - ✅ Jogar no modo Desafio
+   - ✅ Verificar se dados persistem após restart
 
 ## 🔄 **COMO FUNCIONA**
 

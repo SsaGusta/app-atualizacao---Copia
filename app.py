@@ -74,9 +74,14 @@ try:
     ML_SYSTEM_AVAILABLE = True
     logger.info("Sistema de ML importado com sucesso")
     ml_system = LibrasMLSystem()
+    print(f"Banco de dados ML inicializado: {ml_system.db_path}")
 except ImportError as e:
     ML_SYSTEM_AVAILABLE = False
     print(f"Aviso: Sistema de ML não disponível: {e}")
+    ml_system = None
+except Exception as e:
+    ML_SYSTEM_AVAILABLE = False
+    print(f"Aviso: Erro ao inicializar ML system: {e}")
     ml_system = None
 
 # ===== CONFIGURAÇÃO DA APLICAÇÃO =====
