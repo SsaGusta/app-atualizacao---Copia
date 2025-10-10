@@ -399,6 +399,18 @@ class HandTracker {
                 if (data.success && data.result) {
                     const result = data.result;
                     
+                    // Verificar se todas as propriedades necessárias existem
+                    if (!result.letter) {
+                        console.warn('⚠️ Resultado da API sem propriedade letter');
+                        this.updateDetectedLetter('-');
+                        return;
+                    }
+                    
+                    if (typeof result.similarity === 'undefined') {
+                        console.warn('⚠️ Resultado da API sem propriedade similarity');
+                        result.similarity = 0;
+                    }
+                    
                     // Log detalhado do reconhecimento
                     console.log('🎯 Reconhecimento detalhado:');
                     console.log(`📝 Letra: ${result.letter}`);
@@ -409,11 +421,11 @@ class HandTracker {
                     if (result.detailed_analysis && result.detailed_analysis.statistics) {
                         const stats = result.detailed_analysis.statistics;
                         console.log('📈 Análise dos pontos:');
-                        console.log(`  ✅ Excelentes: ${stats.excellent_points}/21`);
-                        console.log(`  ✔️ Bons: ${stats.good_points}/21`);
-                        console.log(`  ⚠️ Aceitáveis: ${stats.acceptable_points}/21`);
-                        console.log(`  ❌ Ruins: ${stats.bad_points}/21`);
-                        console.log(`  🎯 Taxa de match: ${stats.match_percentage.toFixed(1)}%`);
+                        console.log(`  ✅ Excelentes: ${stats.excellent_points || 0}/21`);
+                        console.log(`  ✔️ Bons: ${stats.good_points || 0}/21`);
+                        console.log(`  ⚠️ Aceitáveis: ${stats.acceptable_points || 0}/21`);
+                        console.log(`  ❌ Ruins: ${stats.bad_points || 0}/21`);
+                        console.log(`  🎯 Taxa de match: ${(stats.match_percentage || 0).toFixed(1)}%`);
                         
                         // Mostrar pontos problemáticos
                         if (result.detailed_analysis.point_analysis) {
@@ -499,19 +511,24 @@ class HandTracker {
                 
                 // Mostrar informações detalhadas
                 if (detailedResult && detailedResult.detailed_analysis) {
-                    const stats = detailedResult.detailed_analysis.statistics;
+                    const stats = detailedResult.detailed_analysis.statistics || {};
+                    
+                    // Verificar se as propriedades existem antes de usar
+                    const excellentPoints = stats.excellent_points || 0;
+                    const goodPoints = stats.good_points || 0;
+                    const matchPercentage = stats.match_percentage || 0;
                     
                     // Tooltip detalhado
                     letterElement.title = `Similaridade: ${(detailedResult.similarity * 100).toFixed(1)}%\n` +
-                                         `Pontos excelentes: ${stats.excellent_points}/21\n` +
-                                         `Pontos bons: ${stats.good_points}/21\n` +
-                                         `Taxa de match: ${stats.match_percentage.toFixed(1)}%`;
+                                         `Pontos excelentes: ${excellentPoints}/21\n` +
+                                         `Pontos bons: ${goodPoints}/21\n` +
+                                         `Taxa de match: ${matchPercentage.toFixed(1)}%`;
                     
                     // Informações na interface
                     if (analysisElement && detailsElement) {
                         analysisElement.innerHTML = `Similaridade: ${(detailedResult.similarity * 100).toFixed(1)}% | ` +
-                                                   `Match: ${stats.match_percentage.toFixed(1)}% | ` +
-                                                   `Pontos OK: ${stats.excellent_points + stats.good_points}/21`;
+                                                   `Match: ${matchPercentage.toFixed(1)}% | ` +
+                                                   `Pontos OK: ${excellentPoints + goodPoints}/21`;
                         detailsElement.style.display = 'block';
                     }
                     
