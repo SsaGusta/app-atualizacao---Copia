@@ -59,6 +59,10 @@ try:
     GESTURE_MANAGER_AVAILABLE = True
     logger.info("Módulo gesture_manager importado com sucesso")
     gesture_manager = GestureManager()
+    
+    # Garantir que os gestos estejam carregados
+    gesture_manager.ensure_gestures_available()
+    
 except ImportError as e:
     GESTURE_MANAGER_AVAILABLE = False
     print(f"Aviso: Sistema de gestos não disponível: {e}")
@@ -1018,17 +1022,22 @@ def recognize_gesture():
     """Reconhece um gesto usando sistema híbrido (tradicional + ML)"""
     try:
         if not GESTURE_MANAGER_AVAILABLE or not gesture_manager:
+            logger.error("Sistema de gestos não disponível")
             return jsonify({"success": False, "error": "Sistema de gestos não disponível"}), 500
         
         data = request.get_json()
         if not data:
+            logger.error("Dados não fornecidos na requisição")
             return jsonify({"success": False, "error": "Dados não fornecidos"}), 400
         
         landmarks = data.get('landmarks', [])
         collect_for_ml = data.get('collect_for_ml', True)  # Coletar para ML por padrão
         
         if not landmarks or len(landmarks) != 21:
-            return jsonify({"success": False, "error": "Landmarks inválidos"}), 400
+            logger.error(f"Landmarks inválidos: {len(landmarks) if landmarks else 0} pontos")
+            return jsonify({"success": False, "error": "Landmarks inválidos - deve ter 21 pontos"}), 400
+        
+        logger.info(f"Reconhecendo gesto com {len(landmarks)} landmarks")
         
         # Reconhecimento híbrido
         if ML_SYSTEM_AVAILABLE and ml_system:
@@ -1045,6 +1054,8 @@ def recognize_gesture():
                     'method': 'traditional'
                 }
         
+        logger.info(f"Resultado do reconhecimento: {result}")
+        
         if result['final']:
             # Atualizar estatísticas
             gesture_manager.update_recognition_stats(result['final'])
@@ -1060,8 +1071,8 @@ def recognize_gesture():
                             user_result = db.get_user(session['username'])
                             if user_result:
                                 user_id = user_result[0]
-                        except:
-                            pass
+                        except Exception as db_e:
+                            logger.warning(f"Erro ao obter user_id: {db_e}")
                     
                     ml_system.collect_gesture_example(
                         letter=result['final'],
@@ -1070,9 +1081,11 @@ def recognize_gesture():
                         confidence=result['confidence'],
                         source='recognition'
                     )
-                except Exception as e:
-                    logger.warning(f"Erro ao coletar exemplo ML: {e}")
+                    logger.info(f"Exemplo ML coletado para letra {result['final']}")
+                except Exception as ml_e:
+                    logger.warning(f"Erro ao coletar exemplo ML: {ml_e}")
             
+            logger.info(f"Gesto reconhecido: {result['final']} com confiança {result['confidence']:.3f}")
             return jsonify({
                 "success": True, 
                 "result": {
@@ -1083,10 +1096,21 @@ def recognize_gesture():
                 }
             })
         else:
-            return jsonify({"success": False, "message": "Nenhuma letra reconhecida"})
+            logger.info("Nenhuma letra reconhecida")
+            return jsonify({
+                "success": False, 
+                "message": "Nenhuma letra reconhecida",
+                "debug_info": {
+                    "traditional_result": result.get('traditional'),
+                    "ml_result": result.get('ml'),
+                    "method": result.get('method', 'none')
+                }
+            })
             
     except Exception as e:
         logger.error(f"Erro ao reconhecer gesto: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"success": False, "error": f"Erro interno: {e}"}), 500
 
 @app.route('/api/export_gestures', methods=['GET'])
@@ -1125,6 +1149,42 @@ def gesture_analytics():
     except Exception as e:
         logger.error(f"Erro ao recuperar estatísticas: {e}")
         return jsonify({}), 500
+
+@app.route('/api/gesture_sync_info', methods=['GET'])
+def gesture_sync_info():
+    """Retorna informações de sincronização dos gestos"""
+    try:
+        if not GESTURE_MANAGER_AVAILABLE or not gesture_manager:
+            return jsonify({"error": "Sistema de gestos não disponível"}), 500
+        
+        sync_info = gesture_manager.get_gesture_sync_info()
+        return jsonify(sync_info)
+        
+    except Exception as e:
+        logger.error(f"Erro ao obter info de sincronização: {e}")
+        return jsonify({"error": f"Erro interno: {e}"}), 500
+
+@app.route('/api/refresh_gestures', methods=['POST'])
+def refresh_gestures():
+    """Força o recarregamento dos gestos"""
+    try:
+        if not GESTURE_MANAGER_AVAILABLE or not gesture_manager:
+            return jsonify({"error": "Sistema de gestos não disponível"}), 500
+        
+        # Invalidar cache e recarregar
+        gesture_manager.invalidate_cache()
+        gestures = gesture_manager.get_all_gestures()
+        
+        return jsonify({
+            "success": True,
+            "message": "Gestos recarregados com sucesso",
+            "total_gestures": len(gestures),
+            "letters": list(gestures.keys())
+        })
+        
+    except Exception as e:
+        logger.error(f"Erro ao recarregar gestos: {e}")
+        return jsonify({"error": f"Erro interno: {e}"}), 500
 
 @app.route('/debug-recognition')
 def debug_recognition():
